@@ -51,6 +51,14 @@ namespace ServiceStack.Common.Web
         public const string AllowHeaders = "Access-Control-Allow-Headers";
 
         public const string AllowCredentials = "Access-Control-Allow-Credentials";
+        
+        public const string ExposeHeaders = "Access-Control-Expose-Headers";
+        
+        public const string RequestMethod = "Access-Control-Request-Method";
+        
+        public const string RequestHeader = "Access-Control-Request-Header";
+
+        public const string MaxAge = "Access-Control-Max-Age";
 
         public const string AcceptRanges = "Accept-Ranges";
 
