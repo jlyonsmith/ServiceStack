@@ -1,6 +1,4 @@
-using System;
 using System.Runtime.Serialization;
-using ServiceStack.ServiceHost;
 using ServiceStack.WebHost.Endpoints.Tests.Support.Host;
 
 namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
@@ -21,13 +19,21 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 		public int ExecuteAsyncTimes { get; set; }
 	}
 
-	public class TestAsyncService 
-		: IService<TestAsync>, IAsyncService<TestAsync>
+    [Route("/returnsvoid")]
+    [DataContract]
+    public class ReturnsVoid : IReturnVoid
+    {
+        [DataMember]
+        public string Message { get; set; }
+    }
+
+	public class TestAsyncService : IService
 	{
 		private readonly IFoo foo;
 
 		public static int ExecuteTimes { get; private set; }
 		public static int ExecuteAsyncTimes { get; private set; }
+	    public static string ReturnVoidMessage;
 		
 		public static void ResetStats()
 		{
@@ -40,14 +46,14 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 			this.foo = foo;
 		}
 
-		public object Execute(TestAsync request)
+		public object Any(TestAsync request)
 		{
 			return new TestAsyncResponse { Foo = this.foo, ExecuteTimes = ++ExecuteTimes };
 		}
 
-		public object ExecuteAsync(TestAsync request)
-		{
-			return new TestAsyncResponse { Foo = this.foo, ExecuteAsyncTimes = ++ExecuteAsyncTimes };
-		}
+        public void Any(ReturnsVoid request)
+        {
+            ReturnVoidMessage = request.Message;
+        }
 	}
 }

@@ -1,9 +1,8 @@
 using System.Runtime.Serialization;
-using ServiceStack.ServiceHost;
 
 namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 {
-	[Restrict(EndpointAttributes.Localhost)]
+	[Restrict(RequestAttributes.Localhost)]
 	[DataContract]
 	public class LocalhostRestriction { }
 
@@ -18,5 +17,17 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 			return new LocalhostRestrictionResponse();
 		}
 	}
+
+
+    public class LocalhostRestrictionOnService : IReturn<Response> { }
+
+    [Restrict(LocalhostOnly = true)]
+    public class LocalHostOnService : Service
+    {
+        public Response Any(LocalhostRestrictionOnService request)
+        {
+            return new Response();
+        }
+    }
 
 }

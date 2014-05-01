@@ -2,13 +2,9 @@
 using System.Runtime.Serialization;
 using System.Text;
 using NUnit.Framework;
-using ServiceStack.Common;
+using ServiceStack.Common.Tests;
 using ServiceStack.Logging;
-using ServiceStack.Logging.Support.Logging;
-using ServiceStack.Plugins.ProtoBuf;
-using ServiceStack.ServiceClient.Web;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.ServiceModel;
+using ServiceStack.ProtoBuf;
 using ServiceStack.Text;
 using ServiceStack.WebHost.Endpoints.Tests.Support.Host;
 
@@ -68,9 +64,9 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 		public ResponseStatus ResponseStatus { get; set; }
 	}
 
-	public class ProtoBufEmailService : ServiceBase<ProtoBufEmail>
+	public class ProtoBufEmailService : Service
 	{
-		protected override object Run(ProtoBufEmail request)
+        public object Any(ProtoBufEmail request)
 		{
 			return request;
 		}
@@ -78,7 +74,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
 
 	[TestFixture]
-	public class ProtoBufServiceTests
+    public class ProtoBufServiceTests
 	{
 		protected const string ListeningOn = "http://localhost:85/";
 
@@ -105,7 +101,6 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 		{
 			if (appHost == null) return;
 			appHost.Dispose();
-			appHost = null;
 		}
 
 		[Test]

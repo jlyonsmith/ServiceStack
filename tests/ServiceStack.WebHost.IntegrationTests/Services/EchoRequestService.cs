@@ -1,7 +1,5 @@
 using System;
 using System.Runtime.Serialization;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
 
 namespace ServiceStack.WebHost.IntegrationTests.Services
 {
@@ -38,10 +36,9 @@ namespace ServiceStack.WebHost.IntegrationTests.Services
 		public string Result { get; set; }
 	}
 
-	public class EchoRequestService 
-		: ServiceBase<EchoRequest>
+	public class EchoRequestService : Service
 	{
-		protected override object Run(EchoRequest request)
+        public object Any(EchoRequest request)
 		{
 			return request;
 		}

@@ -4,9 +4,8 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using ServiceStack.Logging;
 
-namespace ServiceStack.Common.Extensions
+namespace ServiceStack
 {
     /// <summary>
     /// Useful IPAddressExtensions from: 
@@ -114,7 +113,7 @@ namespace ServiceStack.Common.Extensions
 
             try
             {
-#if !SILVERLIGHT 
+#if !SL5 
                 foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     foreach (var uipi in ni.GetIPProperties().UnicastAddresses)
@@ -144,7 +143,7 @@ namespace ServiceStack.Common.Extensions
 
             try
             {
-#if !SILVERLIGHT 
+#if !SL5 
                 foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     foreach (var uipi in ni.GetIPProperties().UnicastAddresses)

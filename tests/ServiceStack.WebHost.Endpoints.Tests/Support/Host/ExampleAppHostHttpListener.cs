@@ -4,25 +4,17 @@ using System.Net;
 using System.Runtime.Serialization;
 using System.Threading;
 using Funq;
-using ServiceStack.Common.Extensions;
-using ServiceStack.Common.Web;
 using ServiceStack.Configuration;
+using ServiceStack.Data;
 using ServiceStack.DataAnnotations;
 using ServiceStack.Logging;
-using ServiceStack.Logging.Support.Logging;
 using ServiceStack.OrmLite;
-using ServiceStack.OrmLite.Sqlite;
-using ServiceStack.Plugins.ProtoBuf;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.ServiceModel;
-using ServiceStack.Text;
+using ServiceStack.ProtoBuf;
 using ServiceStack.WebHost.Endpoints.Tests.IntegrationTests;
 using ServiceStack.WebHost.Endpoints.Tests.Support.Operations;
 
 namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 {
-
 	[Route("/factorial/{ForNumber}")]
 	[DataContract]
 	public class GetFactorial
@@ -51,23 +43,15 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		}
 	}
 
-	[DataContract]
-	public class AlwaysThrows { }
+    public class TestProgress : IReturn<string> {}
 
-	[DataContract]
-	public class AlwaysThrowsResponse : IHasResponseStatus
-	{
-		[DataMember]
-		public ResponseStatus ResponseStatus { get; set; }
-	}
-
-	public class AlwaysThrowsService : ServiceInterface.Service
-	{
-	    public object Any(AlwaysThrows request)
-		{
-			throw new ArgumentException("This service always throws an error");
-		}
-	}
+    public class DownloadProgressService : Service
+    {
+        public string Any(TestProgress request)
+        {
+            return ResetMoviesService.Top5Movies.ToJson();
+        }
+    }
 
 
 	[Route("/movies", "POST,PUT")]
@@ -142,7 +126,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 	}
 
 
-    public class MovieService : ServiceInterface.Service
+    public class MovieService : Service
 	{
 		public IDbConnectionFactory DbFactory { get; set; }
 
@@ -151,9 +135,12 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		/// </summary>
 		public object Get(Movie movie)
 		{
-			return new MovieResponse {
-				Movie = DbFactory.Run(db => db.GetById<Movie>(movie.Id))
-			};
+		    using (var db = DbFactory.Open())
+		    {
+		        return new MovieResponse {
+		            Movie = db.SingleById<Movie>(movie.Id)
+		        };
+		    }
 		}
 
 		/// <summary>
@@ -161,20 +148,23 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		/// </summary>
 		public object Post(Movie movie)
 		{
-			var newMovieId = DbFactory.Run(db => {
-				db.Insert(movie);
-				return db.GetLastInsertId();
-			});
+		    using (var db = DbFactory.Open())
+		    {
+                db.Save(movie);
 
-			var newMovie = new MovieResponse {
-				Movie = DbFactory.Run(db => db.GetById<Movie>(newMovieId))
-			};
-			return new HttpResult(newMovie) {
-				StatusCode = HttpStatusCode.Created,
-				Headers = {
-					{ HttpHeaders.Location, this.RequestContext.AbsoluteUri.WithTrailingSlash() + newMovieId }
-				}
-			};
+                var newMovie = new MovieResponse
+                {
+                    Movie = db.SingleById<Movie>(movie.Id)
+                };
+
+                return new HttpResult(newMovie)
+                {
+                    StatusCode = HttpStatusCode.Created,
+                    Headers = {
+					    { HttpHeaders.Location, this.Request.AbsoluteUri.WithTrailingSlash() + movie.Id }
+				    }
+                };
+            }
 		}
 
 		/// <summary>
@@ -182,8 +172,11 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		/// </summary>
 		public object Put(Movie movie)
 		{
-			DbFactory.Run(db => db.Save(movie));
-			return new MovieResponse();
+		    using (var db = DbFactory.Open())
+		    {
+		        db.Save(movie);
+		        return new MovieResponse();
+		    }
 		}
 
 		/// <summary>
@@ -191,8 +184,11 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		/// </summary>
 		public object Delete(Movie request)
 		{
-			DbFactory.Run(db => db.DeleteById<Movie>(request.Id));
-			return new MovieResponse();
+		    using (var db = DbFactory.Open())
+		    {
+		        db.DeleteById<Movie>(request.Id);
+		        return new MovieResponse();
+		    }
 		}
 	}
 
@@ -221,7 +217,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		public List<Movie> Movies { get; set; }
 	}
 
-    public class MoviesService : ServiceInterface.Service
+    public class MoviesService : Service
 	{
 		/// <summary>
 		/// GET /movies 
@@ -255,7 +251,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		public List<Movie> Movies { get; set; }
 	}
 
-    public class MoviesZipService : ServiceInterface.Service
+    public class MoviesZipService : Service
 	{
 		public IDbConnectionFactory DbFactory { get; set; }
 
@@ -266,13 +262,17 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 
 		public object Post(MoviesZip request)
 		{
-			var response = new MoviesZipResponse {
-				Movies = request.Genre.IsNullOrEmpty()
-					? DbFactory.Run(db => db.Select<Movie>())
-					: DbFactory.Run(db => db.Select<Movie>("Genres LIKE {0}", "%" + request.Genre + "%"))
-			};
+		    using (var db = DbFactory.Open())
+		    {
+                var response = new MoviesZipResponse
+                {
+                    Movies = request.Genre.IsNullOrEmpty()
+                        ? db.Select<Movie>()
+                        : db.Select<Movie>("Genres LIKE {0}", "%" + request.Genre + "%")
+                };
 
-			return RequestContext.ToOptimizedResult(response);
+                return Request.ToOptimizedResult(response);
+            }
 		}
 	}
 
@@ -294,7 +294,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		public ResponseStatus ResponseStatus { get; set; }
 	}
 
-	public class ResetMoviesService : ServiceInterface.Service
+	public class ResetMoviesService : Service
 	{
 		public static List<Movie> Top5Movies = new List<Movie>
 		{
@@ -355,7 +355,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
         public string PageElementResponse { get; set; }
     }
 
-    public class InboxPostResponseRequestService : ServiceInterface.Service
+    public class InboxPostResponseRequestService : Service
     {
         public object Any(InboxPostResponseRequest request)
         {
@@ -377,7 +377,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
         public int Id { get; set; }
     }
 
-    public class InboxPostService : ServiceInterface.Service
+    public class InboxPostService : Service
     {
         public object Any(InboxPost request)
         {
@@ -392,7 +392,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
     [Route("/long_running")]
     public class LongRunning { }
 
-    public class LongRunningService : ServiceInterface.Service
+    public class LongRunningService : Service
     {
         public object Any(LongRunning request)
         {
@@ -418,10 +418,8 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 
 		public override void Configure(Container container)
 		{
-			EndpointHostConfig.Instance.GlobalResponseHeaders.Clear();
-
 			//Signal advanced web browsers what HTTP Methods you accept
-			base.SetConfig(new EndpointHostConfig {
+			base.SetConfig(new HostConfig {
 				GlobalResponseHeaders =
 				{
 					{ "Access-Control-Allow-Origin", "*" },
@@ -445,17 +443,15 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 				.Add<GetHttpResult>("/gethttpresult")
 			;
 
-			container.Register<IResourceManager>(new ConfigurationResourceManager());
+			container.Register<IAppSettings>(new AppSettings());
 
 			//var appSettings = container.Resolve<IResourceManager>();
 
-			container.Register(c => new ExampleConfig(c.Resolve<IResourceManager>()));
+			container.Register(c => new ExampleConfig(c.Resolve<IAppSettings>()));
 			//var appConfig = container.Resolve<ExampleConfig>();
 
 			container.Register<IDbConnectionFactory>(c =>
-				new OrmLiteConnectionFactory(
-					":memory:", false,
-					SqliteOrmLiteDialectProvider.Instance));
+				new OrmLiteConnectionFactory(":memory:", SqliteDialect.Provider));
 
 			var resetMovies = container.Resolve<ResetMoviesService>();
 			resetMovies.Post(null);
@@ -473,12 +469,11 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		}
 	}
 
-    public class ExampleAppHostHttpListenerLongRunning
-    : AppHostHttpListenerLongRunningBase
+    public class ExampleAppHostHttpListenerPool : AppHostHttpListenerPoolBase
     {
         //private static ILog log;
 
-        public ExampleAppHostHttpListenerLongRunning()
+        public ExampleAppHostHttpListenerPool()
             : base("ServiceStack Examples", 500, typeof(GetFactorialService).Assembly)
         {
             LogManager.LogFactory = new DebugLogFactory();
@@ -489,10 +484,8 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 
         public override void Configure(Container container)
         {
-            EndpointHostConfig.Instance.GlobalResponseHeaders.Clear();
-
             //Signal advanced web browsers what HTTP Methods you accept
-            base.SetConfig(new EndpointHostConfig
+            base.SetConfig(new HostConfig
             {
                 GlobalResponseHeaders =
 				{
@@ -517,17 +510,13 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
                 .Add<GetHttpResult>("/gethttpresult")
             ;
 
-            container.Register<IResourceManager>(new ConfigurationResourceManager());
+            container.Register<IAppSettings>(new AppSettings());
 
-            //var appSettings = container.Resolve<IResourceManager>();
-
-            container.Register(c => new ExampleConfig(c.Resolve<IResourceManager>()));
+            container.Register(c => new ExampleConfig(c.Resolve<IAppSettings>()));
             //var appConfig = container.Resolve<ExampleConfig>();
 
             container.Register<IDbConnectionFactory>(c =>
-                new OrmLiteConnectionFactory(
-                    ":memory:", false,
-                    SqliteOrmLiteDialectProvider.Instance));
+                new OrmLiteConnectionFactory(":memory:", SqliteDialect.Provider));
 
             var resetMovies = container.Resolve<ResetMoviesService>();
             resetMovies.Post(null);

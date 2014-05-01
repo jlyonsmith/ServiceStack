@@ -2,13 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using NUnit.Framework;
-using ServiceStack.Common;
-using ServiceStack.Common.Utils;
 using ServiceStack.Html;
 using ServiceStack.Razor;
 using ServiceStack.ServiceHost.Tests.Formats;
-using ServiceStack.ServiceInterface.Testing;
+using ServiceStack.Testing;
 using ServiceStack.Text;
 using ServiceStack.VirtualPath;
 
@@ -32,7 +31,7 @@ namespace ServiceStack.ServiceHost.Tests.Formats_Razor
         public List<string> Labels { get; set; }
     }
 
-    public class CustomViewBase<T> : ViewPage<T> where T : class
+    public class CustomViewBase<T> : ViewPage<T>
     {
         public CustomMarkdownHelper Ext = new CustomMarkdownHelper();
         public ExternalProductHelper Prod = new ExternalProductHelper();
@@ -126,9 +125,13 @@ namespace ServiceStack.ServiceHost.Tests.Formats_Razor
                 },
         };
 
+        private ServiceStackHost appHost;
+
         [TestFixtureSetUp]
         public void TestFixtureSetUp()
         {
+            appHost = new BasicAppHost().Init();
+
             staticTemplatePath = "Views/Shared/_Layout.cshtml";
             staticTemplateContent = File.ReadAllText("~/{0}".Fmt(staticTemplatePath).MapProjectPath());
 
@@ -139,6 +142,12 @@ namespace ServiceStack.ServiceHost.Tests.Formats_Razor
             dynamicListPageContent = File.ReadAllText("~/{0}".Fmt(dynamicListPagePath).MapProjectPath());
 
             templateArgs = person;
+        }
+
+        [TestFixtureTearDown]
+        public void TestFixtureTearDown()
+        {
+            appHost.Dispose();
         }
 
         [SetUp]

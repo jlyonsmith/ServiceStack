@@ -1,18 +1,17 @@
 using System;
 using System.Reflection;
-using System.Linq;
 using ServiceStack.Text;
+using System.Linq.Expressions;
 
-namespace ServiceStack.Common.Reflection
+namespace ServiceStack.Reflection
 {
 
-#if MONOTOUCH || SILVERLIGHT
+#if IOS || SL5
     public static class StaticAccessors
     {
     }
 #else
-    using System.Linq.Expressions;
-
+    
     public static class StaticAccessors
     {
         public static Func<object, object> GetValueGetter(Type type, PropertyInfo propertyInfo)
@@ -91,7 +90,7 @@ namespace ServiceStack.Common.Reflection
             var genericMi = mi.MakeGenericMethod(pi.PropertyType);
             var typedGetPropertyFn = (Delegate)genericMi.Invoke(null, new[] { pi });
 
-#if MONOTOUCH || SILVERLIGHT || NETFX_CORE
+#if IOS || SL5 || NETFX_CORE
             return x => typedGetPropertyFn.InvokeMethod(x);
 #else
 
@@ -141,7 +140,7 @@ namespace ServiceStack.Common.Reflection
             var genericMi = mi.MakeGenericMethod(pi.PropertyType);
             var typedSetPropertyFn = (Delegate)genericMi.Invoke(null, new[] { pi });
 
-#if MONOTOUCH || SILVERLIGHT || NETFX_CORE
+#if IOS || SL5 || NETFX_CORE
             return (x, y) => typedSetPropertyFn.InvokeMethod(x, new[] { y });
 #else
 

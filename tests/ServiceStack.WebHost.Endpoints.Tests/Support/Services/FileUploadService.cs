@@ -1,19 +1,13 @@
 using System;
 using System.IO;
 using System.Runtime.Serialization;
-using ServiceStack.Common.Extensions;
-using ServiceStack.Common.Utils;
-using ServiceStack.Common.Web;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.ServiceModel;
 
 namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 {
 	[DataContract]
 	[Route("/fileuploads/{RelativePath*}")]
 	[Route("/fileuploads", HttpMethods.Post)]
-	public class FileUpload
+    public class FileUpload : IReturn<FileUploadResponse>
 	{
 		[DataMember]
 		public string RelativePath { get; set; }
@@ -23,7 +17,10 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 
         [DataMember]
         public int CustomerId { get; set; }
-	}
+
+        [DataMember]
+        public DateTime CreatedDate { get; set; }
+    }
 
 	[DataContract]
 	public class FileUploadResponse : IHasResponseStatus
@@ -48,12 +45,14 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 
         [DataMember]
         public int CustomerId { get; set; }
-	}
 
-	public class FileUploadService
-		: RestServiceBase<FileUpload>
+        [DataMember]
+        public DateTime CreatedDate { get; set; }
+    }
+
+	public class FileUploadService : Service
 	{
-		public override object OnGet(FileUpload request)
+		public object Get(FileUpload request)
 		{
 			if (request.RelativePath.IsNullOrEmpty())
 				throw new ArgumentNullException("RelativePath");
@@ -66,15 +65,15 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 			return result;
 		}
 
-		public override object OnPost(FileUpload request)
+		public object Post(FileUpload request)
 		{
-			if (this.RequestContext.Files.Length == 0)
+			if (this.Request.Files.Length == 0)
 				throw new FileNotFoundException("UploadError", "No such file exists");
 
 			if (request.RelativePath == "ThrowError")
 				throw new NotSupportedException("ThrowError");
 
-			var file = this.RequestContext.Files[0];
+			var file = this.Request.Files[0];
 			return new FileUploadResponse
 			{
 				FileName = file.FileName,
@@ -82,8 +81,19 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Services
 				ContentType = file.ContentType,
 				Contents = new StreamReader(file.InputStream).ReadToEnd(),
                 CustomerId = request.CustomerId,
-                CustomerName = request.CustomerName
+                CustomerName = request.CustomerName,
+                CreatedDate = request.CreatedDate
 			};
 		}
+
+        public object Put(FileUpload request)
+        {
+            return new FileUploadResponse
+            {
+                CustomerId = request.CustomerId,
+                CustomerName = request.CustomerName,
+                CreatedDate = request.CreatedDate
+            };
+        }
 	}
 }

@@ -1,10 +1,6 @@
-using System;
 using System.Net;
 using System.Runtime.Serialization;
-using ServiceStack.Common.Web;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.ServiceModel;
+using ServiceStack.Web;
 
 namespace ServiceStack.WebHost.IntegrationTests.Services
 {
@@ -32,10 +28,9 @@ namespace ServiceStack.WebHost.IntegrationTests.Services
 		public ResponseStatus ResponseStatus { get; set; }
 	}
 
-    public class HttpResultsService
-        : ServiceBase<HttpResults>
+    public class HttpResultsService : Service
 	{
-        protected override object Run(HttpResults request)
+        public object Any(HttpResults request)
 		{
             if (request.Name == "Error")
                 throw new HttpError(HttpStatusCode.NotFound, "Error NotFound");

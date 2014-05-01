@@ -1,8 +1,5 @@
 using System;
 using System.Runtime.Serialization;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.ServiceModel;
 
 namespace ServiceStack.WebHost.IntegrationTests.Services
 {
@@ -30,10 +27,9 @@ namespace ServiceStack.WebHost.IntegrationTests.Services
 		public ResponseStatus ResponseStatus { get; set; }
 	}
 
-	public class ThrowsArgumentNullService 
-		: ServiceBase<ThrowsArgumentNull>
+	public class ThrowsArgumentNullService : Service
 	{
-		protected override object Run(ThrowsArgumentNull request)
+        public object Any(ThrowsArgumentNull request)
 		{
 			throw new ArgumentNullException("Name");
 		}

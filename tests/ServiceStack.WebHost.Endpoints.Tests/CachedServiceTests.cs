@@ -1,9 +1,5 @@
 using NUnit.Framework;
-using ServiceStack.Common;
-using ServiceStack.Plugins.ProtoBuf;
-using ServiceStack.ServiceClient.Web;
-using ServiceStack.ServiceInterface;
-using ServiceStack.Text;
+using ServiceStack.ProtoBuf;
 using ServiceStack.WebHost.Endpoints.Tests.Support.Host;
 
 namespace ServiceStack.WebHost.Endpoints.Tests
@@ -33,6 +29,26 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             var client = new JsonServiceClient(Config.ServiceStackBaseUri);
 
             var response = client.Get<MoviesResponse>("/cached/movies");
+
+            Assert.That(response.Movies.Count, Is.EqualTo(ResetMoviesService.Top5Movies.Count));
+        }
+
+        [Test]
+        public void Can_call_CachedWithTimeout_WebService_with_JSON()
+        {
+            var client = new JsonServiceClient(Config.ServiceStackBaseUri);
+
+            var response = client.Get<MoviesResponse>("/cached-timeout/movies");
+
+            Assert.That(response.Movies.Count, Is.EqualTo(ResetMoviesService.Top5Movies.Count));
+        }
+
+        [Test]
+        public void Can_call_CachedWithTimeout_and_Redis_WebService_with_JSON()
+        {
+            var client = new JsonServiceClient(Config.ServiceStackBaseUri);
+
+            var response = client.Get<MoviesResponse>("/cached-timeout-redis/movies");
 
             Assert.That(response.Movies.Count, Is.EqualTo(ResetMoviesService.Top5Movies.Count));
         }

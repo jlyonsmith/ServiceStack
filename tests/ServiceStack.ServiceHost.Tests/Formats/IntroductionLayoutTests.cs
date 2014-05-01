@@ -2,13 +2,11 @@
 using System.Collections.Generic;
 using System.Text;
 using NUnit.Framework;
-using ServiceStack.Html;
+using ServiceStack.Formats;
 using ServiceStack.Markdown;
-using ServiceStack.ServiceInterface.Testing;
+using ServiceStack.Support.Markdown;
+using ServiceStack.Testing;
 using ServiceStack.VirtualPath;
-using ServiceStack.WebHost.Endpoints;
-using ServiceStack.WebHost.Endpoints.Formats;
-using ServiceStack.WebHost.Endpoints.Support.Markdown;
 
 namespace ServiceStack.ServiceHost.Tests.Formats
 {
@@ -46,11 +44,25 @@ namespace ServiceStack.ServiceHost.Tests.Formats
 	{
 	    private InMemoryVirtualPathProvider pathProvider;
 	    private MarkdownFormat markdownFormat;
+
+	    private ServiceStackHost appHost;
+
+        [TestFixtureSetUp]
+        public void TestFixtureSetUp()
+        {
+            appHost = new BasicAppHost().Init();
+        }
+
+        [TestFixtureTearDown]
+        public void TestFixtureTearDown()
+        {
+            appHost.Dispose();
+        }
         
 	    [SetUp]
 	    public void SetUp()
 	    {
-	        EndpointHost.VirtualPathProvider = pathProvider = new InMemoryVirtualPathProvider(new BasicAppHost());
+            ServiceStackHost.Instance.VirtualPathProvider = pathProvider = new InMemoryVirtualPathProvider(new BasicAppHost());
             markdownFormat = new MarkdownFormat {
                 VirtualPathProvider = pathProvider,
             };
@@ -111,7 +123,7 @@ page of our web-site. We'll use this in conjunction
 with a layout template. The content you are seeing here
 comes from ^^^websiteTemplate.</p>
 <p>And obviously I can have code in here too. Here is the
-current date/year: 2013</p>
+current date/year: 2014</p>
 
         </div>
     </body>
@@ -212,7 +224,7 @@ page of our web-site. We'll use this in conjunction
 with a layout template. The content you are seeing here
 comes from ^^^websiteTemplate.</p>
 <p>And obviously I can have code in here too. Here is the
-current date/year: 2013</p>
+current date/year: 2014</p>
 
         </div>
         

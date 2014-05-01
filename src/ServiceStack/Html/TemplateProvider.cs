@@ -1,12 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using ServiceStack.Common;
-using ServiceStack.Common.Net30;
 using ServiceStack.IO;
 using ServiceStack.Logging;
 using ServiceStack.Text;
-using ServiceStack.VirtualPath;
 
 namespace ServiceStack.Html
 {
@@ -25,8 +24,8 @@ namespace ServiceStack.Html
             this.defaultTemplateName = defaultTemplateName;
         }
 
-        readonly Dictionary<string, IVirtualFile> templatePathsFound = new Dictionary<string, IVirtualFile>(StringComparer.InvariantCultureIgnoreCase);
-        readonly HashSet<string> templatePathsNotFound = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+        readonly Dictionary<string, IVirtualFile> templatePathsFound = new Dictionary<string, IVirtualFile>(StringComparer.OrdinalIgnoreCase);
+        readonly HashSet<string> templatePathsNotFound = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public string GetTemplatePath(IVirtualDirectory fileDir)
         {

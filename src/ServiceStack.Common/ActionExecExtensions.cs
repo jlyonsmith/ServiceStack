@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using ServiceStack.Common.Support;
+using ServiceStack.Support;
 
 #if NETFX_CORE
 using Windows.System.Threading;
 #endif
 
-namespace ServiceStack.Common
+namespace ServiceStack
 {
     public static class ActionExecExtensions
     {
@@ -56,7 +56,7 @@ namespace ServiceStack.Common
             return WaitAll(waitHandles.ToArray(), (int)timeout.TotalMilliseconds);
         }
 
-#if !SILVERLIGHT && !MONOTOUCH && !XBOX
+#if !SL5 && !IOS && !XBOX
         public static bool WaitAll(this List<IAsyncResult> asyncResults, TimeSpan timeout)
         {
             var waitHandles = asyncResults.ConvertAll(x => x.AsyncWaitHandle);

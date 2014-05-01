@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using NUnit.Framework;
 using ServiceStack.Text;
+using ServiceStack.Web;
 
 namespace ServiceStack.ServiceHost.Tests
 {
@@ -14,7 +15,7 @@ namespace ServiceStack.ServiceHost.Tests
 	{
 		public static string ResolvePath(string mode, string path)
 		{
-			return WebHost.Endpoints.Extensions.HttpRequestExtensions.
+			return HttpRequestExtensions.
 				GetPathInfo(path, mode, path.Split('/').First(x => x != ""));
 		}
 
@@ -34,23 +35,31 @@ namespace ServiceStack.ServiceHost.Tests
 				get { throw new NotImplementedException(); }
 			}
 
-			public T TryResolve<T>()
+		    public IResponse Response { get; private set; }
+
+		    public T TryResolve<T>()
 			{
 				throw new NotImplementedException();
 			}
 
 			public string OperationName { get; set; }
-			public string ContentType { get; private set; }
-			public string HttpMethod { get; private set; }
+		    public string Verb { get; private set; }
+		    public RequestAttributes RequestAttributes { get; set; }
+		    public IRequestPreferences RequestPreferences { get; private set; }
+		    public object Dto { get; set; }
+		    public string ContentType { get; private set; }
+		    public IHttpResponse HttpResponse { get; private set; }
+		    public string HttpMethod { get; private set; }
 			public string UserAgent { get; set; }
             public bool IsLocal { get; set; }
 
 			public IDictionary<string, Cookie> Cookies { get; private set; }
 			public string ResponseContentType { get; set; }
-			public Dictionary<string, object> Items { get; private set; }
-			public NameValueCollection Headers { get; private set; }
-			public NameValueCollection QueryString { get; private set; }
-			public NameValueCollection FormData { get; private set; }
+		    public bool HasExplicitResponseContentType { get; private set; }
+		    public Dictionary<string, object> Items { get; private set; }
+			public INameValueCollection Headers { get; private set; }
+			public INameValueCollection QueryString { get; private set; }
+			public INameValueCollection FormData { get; private set; }
 		    public bool UseBufferedStream { get; set; }
 
 		    public string GetRawBody()
@@ -65,14 +74,16 @@ namespace ServiceStack.ServiceHost.Tests
 
             public string RemoteIp { get; set; }
             public string XForwardedFor { get; set; }
-            public string XRealIp { get; set; }
+		    public int? XForwardedPort { get; set; }
+		    public string XForwardedProtocol { get; set; }
+		    public string XRealIp { get; set; }
 
 		    public bool IsSecureConnection { get; private set; }
 			public string[] AcceptTypes { get; private set; }
 			public string PathInfo { get; private set; }
 			public Stream InputStream { get; private set; }
 			public long ContentLength { get; private set; }
-			public IFile[] Files { get; private set; }
+			public IHttpFile[] Files { get; private set; }
 
 			public string ApplicationFilePath { get; private set; }
 		}

@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using ServiceStack.Common.Extensions;
-using ServiceStack.WebHost.Endpoints;
 
 namespace ServiceStack.Razor.Compilation.CodeTransformers
 {
@@ -10,6 +8,8 @@ namespace ServiceStack.Razor.Compilation.CodeTransformers
         private const string RazorWebPagesSectionName = "system.web.webPages.razor/pages";
         private readonly List<RazorCodeTransformerBase> _transformers = new List<RazorCodeTransformerBase>();
 
+        public static HashSet<string> RazorNamespaces { get; set; }
+
         protected override IEnumerable<RazorCodeTransformerBase> CodeTransformers
         {
             get { return _transformers; }
@@ -18,9 +18,8 @@ namespace ServiceStack.Razor.Compilation.CodeTransformers
         public override void Initialize(RazorPageHost razorHost, IDictionary<string, string> directives)
         {
             //read the base type here from the web.config here
-
-            EndpointHostConfig.RazorNamespaces
-                              .ForEach(ns => razorHost.NamespaceImports.Add(ns));
+            (RazorNamespaces ?? HostContext.Config.RazorNamespaces)
+                .Each(ns => razorHost.NamespaceImports.Add(ns));
 
             base.Initialize(razorHost, directives);
         }

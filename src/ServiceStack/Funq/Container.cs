@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using ServiceStack.Common;
-using ServiceStack.ServiceHost;
-using ServiceStack.Text;
+using ServiceStack;
+using ServiceStack.Web;
 
 namespace Funq
 {
@@ -77,7 +76,16 @@ namespace Funq
                     childContainers.Pop().Dispose();
                 }
             }
-		}
+
+            foreach (var serviceEntry in services.Values)
+            {
+                var disposable = serviceEntry.GetInstance() as IDisposable;
+                if (disposable != null && !(disposable is Container))
+                {
+                    disposable.Dispose();
+                }
+            }
+        }
 
 		/// <include file='Container.xdoc' path='docs/doc[@for="Container.Register(instance)"]/*'/>
 		public void Register<TService>(TService instance)
@@ -365,7 +373,7 @@ namespace Funq
                 TService resolved;
                 if (CheckAdapterFirst
                     && Adapter != null
-                    && typeof(TService) != typeof(IRequestContext)
+                    && typeof(TService) != typeof(IRequest)
                     && !Equals(default(TService), (resolved = Adapter.TryResolve<TService>())))
                 {
                     return new ServiceEntry<TService, TFunc>(
@@ -417,7 +425,7 @@ namespace Funq
                     else
                     {
                         if (Adapter != null
-                            && (typeof(TService) != typeof(IRequestContext)))
+                            && (typeof(TService) != typeof(IRequest)))
                         {
                             return new ServiceEntry<TService, TFunc>(
                                 (TFunc)(object)(Func<Container, TService>)(c => Adapter.TryResolve<TService>()))
@@ -443,7 +451,7 @@ namespace Funq
                 return ex;
 
             var errMsg = "Error trying to resolve Service '{0}' from Adapter '{1}': {2}"
-                .Fmt(typeof(TService).FullName, Adapter.GetType().Name, ex.Message);
+                .Fmt(typeof(TService).FullName, Adapter.GetType().GetOperationName(), ex.Message);
 
             return new Exception(errMsg, ex);
         }

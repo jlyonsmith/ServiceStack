@@ -1,19 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using ServiceStack.Host;
+using ServiceStack.Host.Handlers;
 using ServiceStack.Html;
 using ServiceStack.IO;
 using ServiceStack.Logging;
 using ServiceStack.Razor.Managers;
-using ServiceStack.ServiceHost;
-using ServiceStack.Text;
 using ServiceStack.VirtualPath;
-using ServiceStack.WebHost.Endpoints;
+using ServiceStack.Web;
 
 namespace ServiceStack.Razor
 {
-    public class RazorFormat : IPlugin, IRazorPlugin, IRazorConfig
+    using System.Reflection;
+
+    public class RazorFormat : IPlugin, IRazorPlugin, IRazorConfig, IPreInitPlugin
     {
         public const string TemplatePlaceHolder = "@RenderBody()";
 
@@ -30,6 +31,8 @@ namespace ServiceStack.Razor
             Deny = new List<Predicate<string>> {
                 DenyPathsWithLeading_,
             };
+
+            LoadCompiledViews = new List<Assembly>();
         }
 
         //configs
@@ -38,8 +41,11 @@ namespace ServiceStack.Razor
         public string DefaultPageName { get; set; }
         public string WebHostUrl { get; set; }
         public string ScanRootPath { get; set; }
-        public bool? EnableLiveReload { get; set; }
+        public List<Assembly> LoadCompiledViews { get; set; }
         public List<Predicate<string>> Deny { get; set; }
+        public bool? EnableLiveReload { get; set; }
+        public bool? PrecompilePages { get; set; }
+        public bool? WaitForPrecompilationOnStartup { get; set; }
         public IVirtualPathProvider VirtualPathProvider { get; set; }
         public ILiveReload LiveReload { get; set; }
         public Func<RazorViewManager, ILiveReload> LiveReloadFactory { get; set; }
@@ -50,11 +56,20 @@ namespace ServiceStack.Razor
             return Path.GetFileName(path).StartsWith("_");
         }
 
-        public bool WatchForModifiedPages { get; set; }
+        public bool WatchForModifiedPages
+        {
+            get { return EnableLiveReload.GetValueOrDefault(); }
+            set { EnableLiveReload = value; }
+        }
 
         //managers
         protected RazorViewManager ViewManager;
         protected RazorPageResolver PageResolver;
+
+        public void Configure(IAppHost appHost)
+        {
+            LoadCompiledViews.Each(appHost.Config.EmbeddedResourceSources.AddIfNotExists);
+        }
 
         public void Register(IAppHost appHost)
         {
@@ -62,6 +77,8 @@ namespace ServiceStack.Razor
             this.VirtualPathProvider = VirtualPathProvider ?? appHost.VirtualPathProvider;
             this.WebHostUrl = WebHostUrl ?? appHost.Config.WebHostUrl;
             this.EnableLiveReload = this.EnableLiveReload ?? appHost.Config.DebugMode;
+            this.PrecompilePages = this.PrecompilePages ?? !this.EnableLiveReload;
+            this.WaitForPrecompilationOnStartup = this.WaitForPrecompilationOnStartup ?? !this.EnableLiveReload;
 
             try
             {
@@ -71,7 +88,7 @@ namespace ServiceStack.Razor
             }
             catch (Exception ex)
             {
-                ex.StackTrace.PrintDump();
+                appHost.NotifyStartupException(ex);
                 throw;
             }
         }
@@ -139,19 +156,18 @@ namespace ServiceStack.Razor
             return new FileSystemWatcherLiveReload(viewManager);
         }
 
-        public RazorPage FindByPathInfo(string pathInfo)
+        public void ProcessRazorPage(IRequest httpReq, RazorPage contentPage, object model, IResponse httpRes)
         {
-            return ViewManager.GetPageByPathInfo(pathInfo);
+            PageResolver.ExecuteRazorPage(httpReq, httpRes, model, contentPage);
         }
 
-        public void ProcessRazorPage(IHttpRequest httpReq, RazorPage contentPage, object model, IHttpResponse httpRes)
-        {
-            PageResolver.ResolveAndExecuteRazorPage(httpReq, httpRes, model, contentPage);
-        }
-
-        public void ProcessRequest(IHttpRequest httpReq, IHttpResponse httpRes, object dto)
+        public void ProcessRequest(IRequest httpReq, IResponse httpRes, object dto)
         {
             PageResolver.ProcessRequest(httpReq, httpRes, dto);
+        }
+        public void ProcessContentPageRequest(IRequest httpReq, IResponse httpRes)
+        {
+            ((IServiceStackHandler)PageResolver).ProcessRequest(httpReq, httpRes, httpReq.OperationName);
         }
 
         public RazorPage AddPage(string filePath)
@@ -159,14 +175,14 @@ namespace ServiceStack.Razor
             return ViewManager.AddPage(filePath);
         }
 
-        public RazorPage GetPageByName(string pageName)
+        public RazorPage GetViewPage(string pageName)
         {
-            return ViewManager.GetPageByName(pageName);
+            return ViewManager.GetViewPage(pageName);
         }
 
-        public RazorPage GetPageByPathInfo(string pathInfo)
+        public RazorPage GetContentPage(string pathInfo)
         {
-            return ViewManager.GetPageByPathInfo(pathInfo);
+            return ViewManager.GetContentPage(pathInfo);
         }
 
         public RazorPage CreatePage(string razorContents)
@@ -210,23 +226,15 @@ namespace ServiceStack.Razor
             if (razorPage == null)
                 throw new ArgumentNullException("razorPage");
 
-            var mqContext = new MqRequestContext();
-
-            var httpReq = new MqRequest(mqContext);
+            var httpReq = new BasicRequest();
             if (layout != null)
             {
                 httpReq.Items[RazorPageResolver.LayoutKey] = layout;
             }
 
-            var httpRes = new MqResponse(mqContext);
+            razorView = PageResolver.ExecuteRazorPage(httpReq, httpReq.Response, model, razorPage);
 
-            razorView = PageResolver.ResolveAndExecuteRazorPage(
-                httpReq: httpReq,
-                httpRes: httpRes,
-                model: model,
-                razorPage: razorPage);
-
-            var ms = (MemoryStream)httpRes.OutputStream;
+            var ms = (MemoryStream)httpReq.Response.OutputStream;
             return ms.ToArray().FromUtf8Bytes();
         }
     }
@@ -237,8 +245,11 @@ namespace ServiceStack.Razor
         Type PageBaseType { get; }
         string DefaultPageName { get; }
         string ScanRootPath { get; }
+        List<Assembly> LoadCompiledViews { get; }
         string WebHostUrl { get; }
         List<Predicate<string>> Deny { get; }
+        bool? PrecompilePages { get; set; }
+        bool? WaitForPrecompilationOnStartup { get; set; }
     }
 
 }

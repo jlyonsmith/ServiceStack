@@ -2,10 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 using NUnit.Framework;
-using ServiceStack.Html;
 using ServiceStack.Razor;
 using ServiceStack.ServiceHost.Tests.Formats;
-using ServiceStack.ServiceInterface.Testing;
+using ServiceStack.Testing;
 using ServiceStack.Text;
 using ServiceStack.VirtualPath;
 
@@ -28,7 +27,7 @@ namespace ServiceStack.ServiceHost.Tests.Formats_Razor
         }
     }
 
-    public class CustomBaseClass<T> : ViewPage<T> where T : class
+    public class CustomBaseClass<T> : ViewPage<T>
     {
         public MvcHtmlString Field(string fieldName, string fieldValue)
         {
@@ -47,6 +46,20 @@ namespace ServiceStack.ServiceHost.Tests.Formats_Razor
     [TestFixture]
     public class IntroductionLayoutRazorTests : RazorTestBase
     {
+        private ServiceStackHost appHost;
+
+        [TestFixtureSetUp]
+        public void TestFixtureSetUp()
+        {
+            appHost = new BasicAppHost().Init();
+        }
+
+        [TestFixtureTearDown]
+        public void TestFixtureTearDown()
+        {
+            appHost.Dispose();
+        }
+
         [SetUp]
         public void OnBeforeEachTest()
         {
@@ -115,7 +128,7 @@ with a layout template. The content you are seeing here
 comes from ^^^websiteTemplate.</p>
 
 <p>And obviously I can have code in here too. Here is the
-current date/year: 2013</p>
+current date/year: 2014</p>
 
         </div>
     
@@ -250,7 +263,7 @@ with a layout template. The content you are seeing here
 comes from ^^^websiteTemplate.</p>
 
 <p>And obviously I can have code in here too. Here is the
-current date/year: 2013</p>
+current date/year: 2014</p>
 
 
 

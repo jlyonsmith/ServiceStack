@@ -1,27 +1,30 @@
 using System.Web.UI;
-using ServiceStack.CacheAccess;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.Auth;
-using ServiceStack.WebHost.Endpoints;
+using ServiceStack.Auth;
+using ServiceStack.Caching;
+using ServiceStack.Configuration;
 using ServiceStack.WebHost.IntegrationTests.Tests;
 
 namespace ServiceStack.WebHost.IntegrationTests
 {
-	public class CustomUserSession : AuthUserSession
-	{
-		public string CustomPropety { get; set; }
+    public class CustomUserSession : AuthUserSession
+    {
+        public string CustomPropety { get; set; }
 
-		public override void OnAuthenticated(IServiceBase authService, IAuthSession session, IOAuthTokens tokens, System.Collections.Generic.Dictionary<string, string> authInfo)
-		{
-			base.OnAuthenticated(authService, session, tokens, authInfo);
+        public override void OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, System.Collections.Generic.Dictionary<string, string> authInfo)
+        {
+            base.OnAuthenticated(authService, session, tokens, authInfo);
 
-			if (session.Email == AuthTestsBase.AdminEmail)
-				session.Roles.Add(RoleNames.Admin);
-		}
-	}
+            if (session.Email == AuthTestsBase.AdminEmail)
+            {
+                var authRepo = authService.TryResolve<IAuthRepository>();
+                var userAuth = authRepo.GetUserAuth(session, tokens);
+                authRepo.AssignRoles(userAuth, roles: new[] { RoleNames.Admin });
+            }
+        }
+    }
 
-	public class PageBase : Page
-	{
+    public class PageBase : Page
+    {
         /// <summary>
         /// Typed UserSession
         /// </summary>
@@ -41,13 +44,13 @@ namespace ServiceStack.WebHost.IntegrationTests
 
         public new ICacheClient Cache
         {
-            get { return AppHostBase.Resolve<ICacheClient>(); }
+            get { return HostContext.Resolve<ICacheClient>(); }
         }
 
         private ISessionFactory sessionFactory;
         public virtual ISessionFactory SessionFactory
         {
-            get { return sessionFactory ?? (sessionFactory = AppHostBase.Resolve<ISessionFactory>()) ?? new SessionFactory(Cache); }
+            get { return sessionFactory ?? (sessionFactory = HostContext.Resolve<ISessionFactory>()) ?? new SessionFactory(Cache); }
         }
 
         /// <summary>

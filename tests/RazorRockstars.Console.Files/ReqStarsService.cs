@@ -7,20 +7,15 @@ using System.Net;
 using System.Runtime.Serialization;
 using System.Threading;
 using NUnit.Framework;
-using ServiceStack.Common;
-using ServiceStack.Common.Web;
+using ServiceStack;
+using ServiceStack.Data;
+using ServiceStack.Host;
 using ServiceStack.Logging;
-using ServiceStack.Logging.Support.Logging;
+using ServiceStack.MsgPack;
+using ServiceStack.NetSerializer;
 using ServiceStack.OrmLite;
-using ServiceStack.Plugins.MsgPack;
-using ServiceStack.Service;
-using ServiceStack.ServiceClient.Web;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.Cors;
-using ServiceStack.ServiceInterface.ServiceModel;
 using ServiceStack.Text;
-using ServiceStack.WebHost.Endpoints;
+using ServiceStack.Web;
 
 namespace RazorRockstars.Console.Files
 {
@@ -166,7 +161,7 @@ namespace RazorRockstars.Console.Files
             return new ReqstarsResponse //matches ReqstarsResponse.cshtml razor view
             {
                 Aged = request.Age,
-                Total = Db.GetScalar<int>("select count(*) from Reqstar"),
+                Total = Db.Scalar<int>("select count(*) from Reqstar"),
                 Results = request.Age.HasValue
                     ? Db.Select<Reqstar>(q => q.Age == request.Age.Value)
                     : Db.Select<Reqstar>()
@@ -184,10 +179,10 @@ namespace RazorRockstars.Console.Files
                 throw new ArgumentException("Invalid Age");
 
             var cacheKey = typeof(CachedAllReqstars).Name;
-            return base.RequestContext.ToOptimizedResultUsingCache(base.Cache, cacheKey, () => 
+            return base.Request.ToOptimizedResultUsingCache(base.Cache, cacheKey, () => 
                 new ReqstarsResponse {
                     Aged = request.Aged,
-                    Total = Db.GetScalar<int>("select count(*) from Reqstar"),
+                    Total = Db.Scalar<int>("select count(*) from Reqstar"),
                     Results = Db.Select<Reqstar>(q => q.Age == request.Aged)
                 });
         }
@@ -195,7 +190,7 @@ namespace RazorRockstars.Console.Files
         [ClientCanSwapTemplates] //allow action-level filters
         public Reqstar Get(GetReqstar request)
         {
-            return Db.Id<Reqstar>(request.Id);
+            return Db.SingleById<Reqstar>(request.Id);
         }
 
         public object Post(Reqstar request)
@@ -203,14 +198,14 @@ namespace RazorRockstars.Console.Files
             if (!request.Age.HasValue)
                 throw new ArgumentException("Age is required");
 
-            Db.Insert(request.TranslateTo<Reqstar>());
+            Db.Insert(request.ConvertTo<Reqstar>());
             return Db.Select<Reqstar>();
         }
 
         public Reqstar Patch(UpdateReqstar request)
         {
             Db.Update<Reqstar>(request, x => x.Id == request.Id);
-            return Db.Id<Reqstar>(request.Id);
+            return Db.SingleById<Reqstar>(request.Id);
         }
 
         public void Any(DeleteReqstar request)
@@ -366,17 +361,17 @@ namespace RazorRockstars.Console.Files
     public class MyResponseFilterAttribute : ResponseFilterAttribute
     {
         public static int Called = 0;
-        public override void Execute(IHttpRequest req, IHttpResponse res, object requestDto)
+        public override void Execute(IRequest req, IResponse res, object responseDto)
         {
             Called++;
-            var x = requestDto;
+            var x = responseDto;
         }
     }
 
     public class MyRequestFilterAttribute : RequestFilterAttribute
     {
         public static int Called = 0;
-        public override void Execute(IHttpRequest req, IHttpResponse res, object responseDto)
+        public override void Execute(IRequest req, IResponse res, object responseDto)
         {
             Called++;
             var x = responseDto;
@@ -404,9 +399,10 @@ namespace RazorRockstars.Console.Files
                 EnableRazor = true, //Uncomment for faster tests!
             };
             appHost.Plugins.Add(new MsgPackFormat());
+            //appHost.Plugins.Add(new NetSerializerFormat());
             //Fast
             appHost.Init();
-            EndpointHost.Config.DebugMode = true;
+            HostContext.Config.DebugMode = true;
             appHost.Start(ListeningOn);
         }
 
@@ -513,6 +509,7 @@ namespace RazorRockstars.Console.Files
 			new XmlServiceClient(BaseUri),
 			new JsvServiceClient(BaseUri),
 			new MsgPackServiceClient(BaseUri),
+            //new NetSerializerServiceClient(BaseUri), 
 		};
 
         protected static IServiceClient[] ServiceClients =
@@ -581,7 +578,7 @@ namespace RazorRockstars.Console.Files
         [Test]
         public void Can_GET_AllReqstars_View()
         {
-            var html = "{0}/reqstars".Fmt(Host).GetStringFromUrl(acceptContentType: "text/html");
+            var html = "{0}/reqstars".Fmt(Host).GetStringFromUrl(accept: "text/html");
             html.Print();
             Assert.That(html, Is.StringContaining("<!--view:AllReqstars.cshtml-->"));
             Assert.That(html, Is.StringContaining("<!--template:HtmlReport.cshtml-->"));
@@ -713,7 +710,7 @@ namespace RazorRockstars.Console.Files
         [Test]
         public void Can_GET_GetReqstar_View()
         {
-            var html = "{0}/reqstars/1".Fmt(Host).GetStringFromUrl(acceptContentType: "text/html");
+            var html = "{0}/reqstars/1".Fmt(Host).GetStringFromUrl(accept: "text/html");
             html.Print();
             Assert.That(html, Is.StringContaining("<!--view:GetReqstar.cshtml-->"));
             Assert.That(html, Is.StringContaining("<!--template:HtmlReport.cshtml-->"));
@@ -774,8 +771,7 @@ namespace RazorRockstars.Console.Files
         [Test, TestCaseSource("RestClients")]
         public void Can_CREATE_Reqstar(IRestClient client)
         {
-            var response = client.Post<List<Reqstar>>("/reqstars",
-                new Reqstar(4, "Just", "Created", 25));
+            var response = client.Post<List<Reqstar>>("/reqstars", new Reqstar(4, "Just", "Created", 25));
 
             Assert.That(response.Count,
                 Is.EqualTo(ReqstarsService.SeedData.Length + 1));
@@ -868,7 +864,7 @@ namespace RazorRockstars.Console.Files
 
             var format = ((ServiceClientBase)client).Format;
             Assert.That(request.ToUrl("GET", format), Is.EqualTo(
-                "/{0}/syncreply/RoutelessReqstar?id=1&firstName=Foo&lastName=Bar".Fmt(format)));
+                "/{0}/reply/RoutelessReqstar?id=1&firstName=Foo&lastName=Bar".Fmt(format)));
             Assert.That(response.Id, Is.EqualTo(request.Id));
             Assert.That(response.FirstName, Is.EqualTo(request.FirstName));
             Assert.That(response.LastName, Is.EqualTo(request.LastName));
@@ -887,7 +883,7 @@ namespace RazorRockstars.Console.Files
 
             var format = ((ServiceClientBase)client).Format;
             Assert.That(request.ToUrl("POST", format), Is.EqualTo(
-                "/{0}/syncreply/RoutelessReqstar".Fmt(format)));
+                "/{0}/reply/RoutelessReqstar".Fmt(format)));
             Assert.That(response.Id, Is.EqualTo(request.Id));
             Assert.That(response.FirstName, Is.EqualTo(request.FirstName));
             Assert.That(response.LastName, Is.EqualTo(request.LastName));
@@ -940,6 +936,19 @@ namespace RazorRockstars.Console.Files
             Assert.That(response4.Name, Is.EqualTo("foo"));
             response4 = "{0}/ignorewildcard/a/b?Name=foo".Fmt(Host).GetJsonFromUrl().FromJson<IgnoreWildcardRoute>();
             Assert.That(response4.Name, Is.EqualTo("foo"));
+        }
+
+        [Test]
+        public void Does_handle_ignored_routes()
+        {
+            var restPath = new RestPath(typeof(IgnoreRoute3), "/ignore/{ignore}/with/{name}");
+            var pathComponents = RestPath.GetPathPartsForMatching("/ignore/AnyThing/with/foo");
+            var score = restPath.MatchScore("GET", pathComponents);
+
+            Assert.That(score, Is.GreaterThan(0));
+
+            var request = (IgnoreRoute3) restPath.CreateRequest("/ignore/AnyThing/with/foo");
+            Assert.That(request.Name, Is.EqualTo("foo"));
         }
     }
     

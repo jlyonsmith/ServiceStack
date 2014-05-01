@@ -1,11 +1,8 @@
-﻿using Funq;
+﻿using System.Net;
+using Funq;
 using NUnit.Framework;
-using ServiceStack.Common;
-using ServiceStack.Common.Web;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
+using ServiceStack.Formats;
 using ServiceStack.Text;
-using ServiceStack.WebHost.Endpoints.Formats;
 
 namespace ServiceStack.WebHost.Endpoints.Tests
 {
@@ -26,7 +23,6 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         public void TestFixtureTearDown()
         {
             appHost.Dispose();
-            appHost = null;
         }
 
         [Test]
@@ -36,7 +32,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                 .GetStringFromUrl(responseFilter: httpRes =>
                 {
                     httpRes.ContentType.Print();
-                    Assert.That(httpRes.ContentType.MatchesContentType(ContentType.Html));
+                    Assert.That(httpRes.ContentType.MatchesContentType(MimeTypes.Html));
                 });
 
             Assert.That(response, Is.StringStarting("<!doctype html>"));
@@ -49,7 +45,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                 .GetStringFromUrl(responseFilter: httpRes =>
                 {
                     httpRes.ContentType.Print();
-                    Assert.That(httpRes.ContentType.MatchesContentType(ContentType.Json));
+                    Assert.That(httpRes.ContentType.MatchesContentType(MimeTypes.Json));
                 });
 
             Assert.That(response.ToLower(), Is.EqualTo( "{\"data\":\"foo\"}"));
@@ -62,10 +58,10 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                 .GetStringFromUrl(responseFilter: httpRes =>
                 {
                     httpRes.ContentType.Print();
-                    Assert.That(httpRes.ContentType.MatchesContentType(ContentType.Xml));
+                    Assert.That(httpRes.ContentType.MatchesContentType(MimeTypes.Xml));
                 });
 
-            Assert.That(response, Is.EqualTo("<CustomRoute xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"http://schemas.servicestack.net/types\"><Data>foo</Data></CustomRoute>"));
+            Assert.That(response, Is.EqualTo("<?xml version=\"1.0\" encoding=\"utf-8\"?><CustomRoute xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"http://schemas.servicestack.net/types\"><Data>foo</Data></CustomRoute>"));
         }
 
         [Test]
@@ -75,7 +71,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                 .GetStringFromUrl(responseFilter: httpRes =>
                 {
                     httpRes.ContentType.Print();
-                    Assert.That(httpRes.ContentType.MatchesContentType(ContentType.Html));
+                    Assert.That(httpRes.ContentType.MatchesContentType(MimeTypes.Html));
                 });
 
             Assert.That(response, Is.StringStarting("<!doctype html>"));
@@ -88,7 +84,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                 .GetStringFromUrl(responseFilter: httpRes =>
                 {
                     httpRes.ContentType.Print();
-                    Assert.That(httpRes.ContentType.MatchesContentType(ContentType.Csv));
+                    Assert.That(httpRes.ContentType.MatchesContentType(MimeTypes.Csv));
                 });
 
             Assert.That(response, Is.EqualTo("Data\r\nfoo\r\n"));
@@ -101,7 +97,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
         public override void Configure(Container container)
         {
-            SetConfig(new EndpointHostConfig {
+            SetConfig(new HostConfig {
                 AllowRouteContentTypeExtensions = true
             });
 
@@ -119,6 +115,79 @@ namespace ServiceStack.WebHost.Endpoints.Tests
     public class CustomRouteService : IService
     {
         public object Any(CustomRoute request)
+        {
+            return request;
+        }
+    }
+
+    [TestFixture]
+    public class ModifiedRouteTests
+    {
+        private ModifiedRouteAppHost appHost;
+
+        [TestFixtureSetUp]
+        public void TestFixtureSetUp()
+        {
+            appHost = new ModifiedRouteAppHost();
+            appHost.Init();
+            appHost.Start(Config.AbsoluteBaseUri);
+        }
+
+        [TestFixtureTearDown]
+        public void TestFixtureTearDown()
+        {
+            appHost.Dispose();
+        }
+
+        [Test]
+        public void Can_download_modified_routes()
+        {
+            try
+            {
+                var notFound = Config.AbsoluteBaseUri.CombineWith("/modified/foo.csv")
+                    .GetStringFromUrl();
+                Assert.Fail("Existing route should be modified");
+            }
+            catch (WebException ex)
+            {
+                Assert.That(ex.GetStatus(), Is.EqualTo(HttpStatusCode.NotFound));
+            }
+
+            var response = Config.AbsoluteBaseUri.CombineWith("/api/modified/foo.csv")
+                .GetStringFromUrl();
+
+            Assert.That(response, Is.EqualTo("Data\r\nfoo\r\n"));
+        }
+    }
+
+    public class ModifiedRouteAppHost : AppHostHttpListenerBase
+    {
+        public ModifiedRouteAppHost() : base(typeof(BufferedRequestTests).Name, typeof(CustomRouteService).Assembly) { }
+
+        public override void Configure(Container container)
+        {
+        }
+
+        public override RouteAttribute[] GetRouteAttributes(System.Type requestType)
+        {
+            var routes = base.GetRouteAttributes(requestType);
+            if (requestType != typeof(ModifiedRoute)) return routes;
+
+            routes.Each(x => x.Path = "/api" + x.Path);
+            return routes;
+        }
+    }
+
+    [Route("/modified")]
+    [Route("/modified/{Data}")]
+    public class ModifiedRoute : IReturn<ModifiedRoute>
+    {
+        public string Data { get; set; }
+    }
+
+    public class ModifiedRouteService : IService
+    {
+        public object Any(ModifiedRoute request)
         {
             return request;
         }

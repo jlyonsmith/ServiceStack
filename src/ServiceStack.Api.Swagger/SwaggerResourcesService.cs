@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
-using ServiceStack.Common.Extensions;
-using ServiceStack.ServiceHost;
-using ServiceStack.WebHost.Endpoints;
+using ServiceStack.Host;
 
 namespace ServiceStack.Api.Swagger
 {
@@ -38,8 +36,9 @@ namespace ServiceStack.Api.Swagger
         public string Description { get; set; }
     }
 
+    [AddHeader(DefaultContentType = MimeTypes.Json)]
     [DefaultRequest(typeof(Resources))]
-    public class SwaggerResourcesService : ServiceInterface.Service
+    public class SwaggerResourcesService : Service
     {
         private readonly Regex resourcePathCleanerRegex = new Regex(@"/[^\/\{]*", RegexOptions.Compiled);
         internal static Regex resourceFilterRegex;
@@ -48,13 +47,21 @@ namespace ServiceStack.Api.Swagger
 
         public object Get(Resources request)
         {
+            var basePath = HostContext.Config.WebHostUrl;
+            if (basePath == null)
+            {
+                basePath = HostContext.Config.UseHttpsLinks
+                    ? Request.GetParentPathUrl().ToHttps()
+                    : Request.GetParentPathUrl();
+            }
+
             var result = new ResourcesResponse
             {
                 SwaggerVersion = "1.1",
-                BasePath = EndpointHost.Config.UseHttpsLinks ? Request.GetParentPathUrl().ToHttps() : Request.GetParentPathUrl(),
+                BasePath = basePath,
                 Apis = new List<RestService>()
             };
-            var operations = EndpointHost.Metadata;
+            var operations = HostContext.Metadata;
             var allTypes = operations.GetAllTypes();
             var allOperationNames = operations.GetAllOperationNames();
             foreach (var operationName in allOperationNames)
@@ -65,15 +72,18 @@ namespace ServiceStack.Api.Swagger
                 if (operationType == null) continue;
                 if (operationType == typeof(Resources) || operationType == typeof(ResourceRequest))
                     continue;
+                if (!operations.IsVisible(Request, Format.Json, operationName)) continue;
 
                 CreateRestPaths(result.Apis, operationType, operationName);
             }
+
+            result.Apis = result.Apis.OrderBy(a => a.Path).ToList();
             return result;
         }
 
         protected void CreateRestPaths(List<RestService> apis, Type operationType, String operationName)
         {
-            var map = EndpointHost.ServiceManager.ServiceController.RestPathMap;
+            var map = HostContext.ServiceController.RestPathMap;
             var paths = new List<string>();
             foreach (var key in map.Keys)
             {
@@ -88,7 +98,7 @@ namespace ServiceStack.Api.Swagger
 
             foreach (var bp in basePaths)
             {
-                if (string.IsNullOrEmpty(bp)) return;
+                if (string.IsNullOrEmpty(bp)) continue;
                 if (apis.All(a => a.Path != string.Concat(RESOURCE_PATH, "/" + bp)))
                 {
                     apis.Add(new RestService

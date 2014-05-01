@@ -8,26 +8,27 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Web;
-using ServiceStack.Common.Web;
+using ServiceStack.Formats;
 using ServiceStack.Html.AntiXsrf;
-using ServiceStack.ServiceHost;
+using ServiceStack.Support.Markdown;
 using ServiceStack.Text;
-using ServiceStack.WebHost.Endpoints.Support.Markdown;
+using ServiceStack.Web;
 
 namespace ServiceStack.Html
 {
 	public class HtmlHelper
     {
-        public static readonly string ValidationInputCssClassName = "input-validation-error";
+        public static string ValidationMessageCssClassNames = "help-block error";
+        public static string ValidationSummaryCssClassNames = "error-summary alert alert-danger";
+        public static string ValidationSuccessCssClassNames = "alert alert-success";
+        public static readonly string ValidationInputCssClassName = "error";
+
         public static readonly string ValidationInputValidCssClassName = "input-validation-valid";
-        public static readonly string ValidationMessageCssClassName = "field-validation-error";
         public static readonly string ValidationMessageValidCssClassName = "field-validation-valid";
-        public static readonly string ValidationSummaryCssClassName = "validation-summary-errors";
         public static readonly string ValidationSummaryValidCssClassName = "validation-summary-valid";
-#if NET_4_0
-        private DynamicViewDataDictionary _dynamicViewDataDictionary;
-#endif
-		public static List<Type> HtmlExtensions = new List<Type> 
+        private DynamicViewDataDictionary viewBag;
+
+        public static List<Type> HtmlExtensions = new List<Type> 
 		{
 			typeof(DisplayTextExtensions),
 			typeof(InputExtensions),
@@ -63,12 +64,12 @@ namespace ServiceStack.Html
 		public Dictionary<string, object> ScopeArgs { get; protected set; }
 	    private ViewDataDictionary viewData;
 
-        public void Init(IViewEngine viewEngine, IHttpRequest httpReq, IHttpResponse httpRes, IRazorView razorPage, 
+        public void Init(IViewEngine viewEngine, IRequest httpReq, IResponse httpRes, IRazorView razorPage, 
             Dictionary<string, object> scopeArgs = null, ViewDataDictionary viewData = null)
         {
             ViewEngine = viewEngine;
-            HttpRequest = httpReq;
-            HttpResponse = httpRes;
+            HttpRequest = httpReq as IHttpRequest;
+            HttpResponse = httpRes as IHttpResponse;
             RazorPage = razorPage;
             //ScopeArgs = scopeArgs;
             this.viewData = viewData;
@@ -147,18 +148,11 @@ namespace ServiceStack.Html
             set { ViewContext.SetUnobtrusiveJavaScriptEnabled(value); }
         }
 
-#if NET_4_0
         public dynamic ViewBag
         {
-            get
-            {
-                if (_dynamicViewDataDictionary == null) {
-                    _dynamicViewDataDictionary = new DynamicViewDataDictionary(() => ViewData);
-                }
-                return _dynamicViewDataDictionary;
-            }
+            get { return viewBag ?? (viewBag = new DynamicViewDataDictionary(() => ViewData)); }
         }
-#endif
+
         public ViewContext ViewContext { get; private set; }
 
 	    public ViewDataDictionary ViewData
@@ -342,13 +336,17 @@ namespace ServiceStack.Html
 
         internal object GetModelStateValue(string key, Type destinationType)
         {
-            ModelState modelState;
-            if (ViewData.ModelState.TryGetValue(key, out modelState)) {
-                if (modelState.Value != null) {
-                    return modelState.Value.ConvertTo(destinationType, null /* culture */);
-                }
-            }
-            return null;
+            if (this.HttpRequest == null || this.HttpRequest.HttpMethod == HttpMethods.Get)
+                return null;
+
+            var postedValue = this.HttpRequest.FormData[key];
+            if (postedValue == null)
+                return null;
+
+            if (destinationType == typeof (string))
+                return postedValue;
+
+            return new ValueProviderResult(postedValue, postedValue, null).ConvertTo(destinationType, null);
         }
 
         public IDictionary<string, object> GetUnobtrusiveValidationAttributes(string name)
@@ -440,11 +438,38 @@ namespace ServiceStack.Html
 			var strContent = content as string;
             return MvcHtmlString.Create(strContent ?? content.ToString()); //MvcHtmlString
 		}
+
+        public bool HasFieldError(string errorName)
+        {
+            return GetFieldError(errorName) != null;
+        }
+
+        public ResponseError GetFieldError(string errorName)
+        {
+            var errorStatus = this.GetErrorStatus();
+            if (errorStatus == null || errorStatus.Errors == null) 
+                return null;
+
+            return errorStatus.Errors.FirstOrDefault(x => x.FieldName.EqualsIgnoreCase(errorName));
+        }
+
+        public ResponseStatus GetErrorStatus()
+        {
+            var errorStatus = this.HttpRequest.GetItem(HtmlFormat.ErrorStatusKey);
+            return errorStatus as ResponseStatus;
+        }
+
+        public MvcHtmlString GetErrorMessage()
+        {
+            var errorStatus = GetErrorStatus();
+            return errorStatus == null ? null : MvcHtmlString.Create(errorStatus.Message);
+        }
+
     }
 
 	public static class HtmlHelperExtensions
 	{
-	    public static IHttpRequest GetHttpRequest(this HtmlHelper html)
+	    public static IRequest GetHttpRequest(this HtmlHelper html)
 	    {
 	        return html != null ? html.HttpRequest : null;
 	    }

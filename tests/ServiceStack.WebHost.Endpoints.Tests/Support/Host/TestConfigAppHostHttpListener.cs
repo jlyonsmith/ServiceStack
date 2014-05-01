@@ -1,8 +1,5 @@
-using System;
 using System.Runtime.Serialization;
 using Funq;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
 
 namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 {
@@ -27,9 +24,9 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 		public string Password { get; set; }
 	}
 
-	public class BclDtoService : ServiceBase<BclDto>
+	public class BclDtoService : Service
 	{
-		protected override object Run(BclDto request)
+	    public object Any(BclDto request)
 		{
 			return new BclDtoResponse
 			{
@@ -49,7 +46,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support.Host
 
 		public override void Configure(Container container)
 		{
-			SetConfig(new EndpointHostConfig
+			SetConfig(new HostConfig
 			{
 				UseBclJsonSerializers = true,
 			});

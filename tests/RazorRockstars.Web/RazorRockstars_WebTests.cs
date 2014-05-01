@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Threading;
 using NUnit.Framework;
+using ServiceStack;
 using ServiceStack.Common;
 using ServiceStack.Text;
 
@@ -258,7 +259,19 @@ namespace RazorRockstars.Web
             AssertStatus(Host + "/throw/404/CustomErrorMessage", HttpStatusCode.NotFound);
         }
 
-	    [Test]
+        [Test]
+        public void Does_allow_matching_fallback_route()
+        {
+            Assert200(Host + "/fallback", "\"Path\":\"fallback\"");
+        }
+
+        [Test]
+        public void Does_not_handle_non_matching_fallback_route()
+        {
+            AssertStatus(Host + "/fallback/extrapath", HttpStatusCode.NotFound);
+        }
+
+	    [Explicit,Test]
 	    public void Test_multithread_errors()
 	    {
 	        var times = 1000;

@@ -1,11 +1,33 @@
-﻿using System.Web;
-using ServiceStack.WebHost.Endpoints;
-using ServiceStack.WebHost.Endpoints.Metadata;
+﻿using System;
+using System.Collections.Generic;
+using System.Web;
+using ServiceStack.Host.Handlers;
+using ServiceStack.Metadata;
 
 namespace ServiceStack
 {
     public class MetadataFeature : IPlugin
     {
+        public string PluginLinksTitle { get; set; }
+        public Dictionary<string, string> PluginLinks { get; set; }
+
+        public string DebugLinksTitle { get; set; }
+        public Dictionary<string, string> DebugLinks { get; set; }
+
+        public Action<IndexOperationsControl> IndexPageFilter { get; set; }
+        public Action<OperationControl> DetailPageFilter { get; set; }
+
+        public MetadataFeature()
+        {
+            PluginLinksTitle = "Plugin Links:";
+            PluginLinks = new Dictionary<string, string>();
+
+            DebugLinksTitle = "Debug Info:";
+            DebugLinks = new Dictionary<string, string> {
+                {"operations/metadata", "Operations Metadata"},
+            };
+        }
+
         public void Register(IAppHost appHost)
         {
             appHost.CatchAllHandlers.Add(ProcessRequest);
@@ -59,33 +81,54 @@ namespace ServiceStack
 
                 case "types":
                     
-                    if (EndpointHost.Config == null
-                        || EndpointHost.Config.MetadataTypesConfig == null)
+                    if (HostContext.Config == null
+                        || HostContext.Config.MetadataTypesConfig == null)
                         return null;
 
-                    if (EndpointHost.Config.MetadataTypesConfig.BaseUrl == null)
-                        EndpointHost.Config.MetadataTypesConfig.BaseUrl = ServiceStackHttpHandlerFactory.GetBaseUrl();
+                    if (HostContext.Config.MetadataTypesConfig.BaseUrl == null)
+                        HostContext.Config.MetadataTypesConfig.BaseUrl = HttpHandlerFactory.GetBaseUrl();
 
-                    return new MetadataTypesHandler { Config = EndpointHost.AppHost.Config.MetadataTypesConfig };
+                    return new MetadataTypesHandler { Config = HostContext.Config.MetadataTypesConfig };
 
                 case "operations":
                     
-                    return new ActionHandler((httpReq, httpRes) => 
-                        EndpointHost.Config.HasAccessToMetadata(httpReq, httpRes) 
-                            ? EndpointHost.Metadata.GetOperationDtos()
+                    return new CustomResponseHandler((httpReq, httpRes) => 
+                        HostContext.AppHost.HasAccessToMetadata(httpReq, httpRes) 
+                            ? HostContext.Metadata.GetOperationDtos()
                             : null, "Operations");
 
                 default:
                     string contentType;
-                    if (EndpointHost.ContentTypeFilter
+                    if (HostContext.ContentTypes
                         .ContentTypeFormats.TryGetValue(pathController, out contentType))
                     {
-                        var format = Common.Web.ContentType.GetContentFormat(contentType);
+                        var format = ContentFormat.GetContentFormat(contentType);
                         return new CustomMetadataHandler(contentType, format);
                     }
                     break;
             }
             return null;
+        }
+    }
+
+    public static class MetadataFeatureExtensions
+    {
+        public static MetadataFeature AddPluginLink(this MetadataFeature metadata, string href, string title)
+        {
+            if (metadata != null)
+            {
+                metadata.PluginLinks[href] = title;
+            }
+            return metadata;
+        }
+
+        public static MetadataFeature AddDebugLink(this MetadataFeature metadata, string href, string title)
+        {
+            if (metadata != null)
+            {
+                metadata.DebugLinks[href] = title;
+            }
+            return metadata;
         }
     }
 }

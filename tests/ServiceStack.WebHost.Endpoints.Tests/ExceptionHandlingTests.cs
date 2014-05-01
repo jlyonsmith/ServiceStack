@@ -1,15 +1,10 @@
 ﻿using System;
 using System.Net;
-using ServiceStack.WebHost.Endpoints.Extensions;
-using ServiceStack.ServiceInterface.ServiceModel;
-using ServiceStack.ServiceInterface;
-using ServiceStack.Common.Web;
-using ServiceStack.ServiceHost;
+using System.Runtime.Serialization;
 using NUnit.Framework;
 using Funq;
-using ServiceStack.Service;
-using ServiceStack.ServiceClient.Web;
 using ServiceStack.Text;
+using ServiceStack.Web;
 
 namespace ServiceStack.WebHost.Endpoints.Tests
 {
@@ -20,24 +15,24 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         public ResponseStatus ResponseStatus { get; set; }
     }
 
-    public class UserService : RestServiceBase<User>
+    public class UserService : Service
     {
-        public override object OnGet(User request)
+        public object Get(User request)
         {
-            return new HttpError(System.Net.HttpStatusCode.BadRequest, "CanNotExecute", "Failed to execute!");
+            return new HttpError(HttpStatusCode.BadRequest, "CanNotExecute", "Failed to execute!");
         }
 
-        public override object OnPost(User request)
+        public object Post(User request)
         {
-            throw new HttpError(System.Net.HttpStatusCode.BadRequest, "CanNotExecute", "Failed to execute!");
+            throw new HttpError(HttpStatusCode.BadRequest, "CanNotExecute", "Failed to execute!");
         }
 
-        public override object OnDelete(User request)
+        public object Delete(User request)
         {
-            throw new HttpError(System.Net.HttpStatusCode.Forbidden, "CanNotExecute", "Failed to execute!");
+            throw new HttpError(HttpStatusCode.Forbidden, "CanNotExecute", "Failed to execute!");
         }
 
-        public override object OnPut(User request)
+        public object Put(User request)
         {
             throw new ArgumentException();
         }
@@ -53,9 +48,9 @@ namespace ServiceStack.WebHost.Endpoints.Tests
     {
         public ResponseStatus ResponseStatus { get; set; }
     }
-    public class ExceptionWithResponseStatusService : ServiceBase<ExceptionWithResponseStatus>
+    public class ExceptionWithResponseStatusService : Service
     {
-        protected override object Run(ExceptionWithResponseStatus request)
+        public object Any(ExceptionWithResponseStatus request)
         {
             throw new CustomException();
         }
@@ -63,18 +58,18 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
     public class ExceptionNoResponseStatus { }
     public class ExceptionNoResponseStatusResponse { }
-    public class ExceptionNoResponseStatusService : ServiceBase<ExceptionNoResponseStatus>
+    public class ExceptionNoResponseStatusService : Service
     {
-        protected override object Run(ExceptionNoResponseStatus request)
+        public object Any(ExceptionNoResponseStatus request)
         {
             throw new CustomException();
         }
     }
 
     public class ExceptionNoResponseDto { }
-    public class ExceptionNoResponseDtoService : ServiceBase<ExceptionNoResponseDto>
+    public class ExceptionNoResponseDtoService : Service
     {
-        protected override object Run(ExceptionNoResponseDto request)
+        public object Any(ExceptionNoResponseDto request)
         {
             throw new CustomException();
         }
@@ -82,13 +77,27 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
     public class UncatchedException { }
     public class UncatchedExceptionResponse { }
-    public class UncatchedExceptionService : IService<UncatchedException>
+    public class UncatchedExceptionService : Service
     {
-        public object Execute(UncatchedException request)
+        public object Any(UncatchedException request)
         {
             //We don't wrap a try..catch block around the service (which happens with ServiceBase<> automatically)
             //so the global exception handling strategy is invoked
             throw new ArgumentException();
+        }
+    }
+
+    [Route("/binding-error/{Id}")]
+    public class ExceptionWithRequestBinding
+    {
+        public int Id { get; set; }
+    }
+
+    public class ExceptionWithRequestBindingService : Service
+    {
+        public object Any(ExceptionWithRequestBinding request)
+        {
+            return request;
         }
     }
 
@@ -109,17 +118,34 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             {
                 JsConfig.EmitCamelCaseNames = true;
 
-                SetConfig(new EndpointHostConfig { DebugMode = false });
+                SetConfig(new HostConfig { DebugMode = false });
 
-                //Uncomment to enable server-side stack traces
-                //SetConfig(new EndpointHostConfig { DebugMode = true });
-
-                //Custom global exception handling strategy
-                this.ExceptionHandler = (req, res, operationName, ex) =>
+                //Custom global uncaught exception handling strategy
+                this.UncaughtExceptionHandlers.Add((req, res, operationName, ex) =>
                 {
-                    res.Write(string.Format("Exception {0}", ex.GetType().Name));
-                    res.EndServiceStackRequest(skipHeaders: true);
-                };
+                    res.Write(string.Format("UncaughtException {0}", ex.GetType().Name));
+                    res.EndRequest(skipHeaders: true);
+                });
+
+                this.ServiceExceptionHandlers.Add((httpReq, request, exception) =>
+                {
+                    if (request is UncatchedException)
+                        throw exception;
+
+                    return null;
+                });
+            }
+
+            public override void OnExceptionTypeFilter(Exception ex, ResponseStatus responseStatus)
+            {
+                "In OnExceptionTypeFilter...".Print();
+                base.OnExceptionTypeFilter(ex, responseStatus);
+            }
+
+            public override void OnUncaughtException(IRequest httpReq, IResponse httpRes, string operationName, Exception ex)
+            {
+                "In OnUncaughtException...".Print();
+                base.OnUncaughtException(httpReq, httpRes, operationName, ex);
             }
         }
 
@@ -137,7 +163,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         public void OnTestFixtureTearDown()
         {
             appHost.Dispose();
-            EndpointHost.ExceptionHandler = null;
+            appHost.UncaughtExceptionHandlers = null;
         }
 
         static IRestClient[] ServiceClients = 
@@ -216,7 +242,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
         public string PredefinedJsonUrl<T>()
         {
-            return ListeningOn + "json/syncreply/" + typeof(T).Name;
+            return ListeningOn + "json/reply/" + typeof(T).Name;
         }
 
         [Test]
@@ -272,8 +298,18 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         public void Can_override_global_exception_handling()
         {
             var req = (HttpWebRequest)WebRequest.Create(PredefinedJsonUrl<UncatchedException>());
-            var res = req.GetResponse().DownloadText();
-            Assert.AreEqual("Exception ArgumentException", res);
+            var res = req.GetResponse().ReadToEnd();
+            Assert.AreEqual("UncaughtException ArgumentException", res);
+        }
+
+        [Test]
+        public void Request_binding_error_raises_UncaughtException()
+        {
+            var response = PredefinedJsonUrl<ExceptionWithRequestBinding>()
+                .AddQueryParam("Id", "NaN")
+                .GetStringFromUrl();
+
+            Assert.That(response, Is.EqualTo("UncaughtException SerializationException"));
         }
     }
 }

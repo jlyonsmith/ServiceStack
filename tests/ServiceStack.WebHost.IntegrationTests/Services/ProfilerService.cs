@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using ServiceStack.Data;
 using ServiceStack.MiniProfiler;
 using ServiceStack.OrmLite;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
 
 namespace ServiceStack.WebHost.IntegrationTests.Services
 {
@@ -13,11 +13,11 @@ namespace ServiceStack.WebHost.IntegrationTests.Services
 		public string Type { get; set; }
 	}
 
-	public class MiniProfilerService : ServiceBase<MiniProfiler>
+	public class MiniProfilerService : Service
 	{
 		public IDbConnectionFactory DbFactory { get; set; }
 
-		protected override object Run(MiniProfiler request)
+        public object Any(MiniProfiler request)
 		{
 			var profiler = Profiler.Current;
 
@@ -28,12 +28,7 @@ namespace ServiceStack.WebHost.IntegrationTests.Services
 				{
 					using (profiler.Step("N + 1 query"))
 					{
-						var results = new List<Movie>();
-						foreach (var movie in db.Select<Movie>())
-						{
-							results.Add(db.QueryById<Movie>(movie.Id));
-						}
-						return results;
+					    return db.Select<Movie>().Select(movie => db.SingleById<Movie>(movie.Id)).ToList();
 					}
 				}
 

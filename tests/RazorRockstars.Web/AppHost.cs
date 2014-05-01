@@ -1,16 +1,15 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Runtime.Serialization;
 using Funq;
-using ServiceStack.Common;
-using ServiceStack.Common.Web;
+using ServiceStack;
+using ServiceStack.Api.Swagger;
+using ServiceStack.Data;
 using ServiceStack.DataAnnotations;
+using ServiceStack.MsgPack;
 using ServiceStack.OrmLite;
-using ServiceStack.Plugins.MsgPack;
 using ServiceStack.Razor;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.WebHost.Endpoints;
 
 //The entire C# code for the stand-alone RazorRockstars demo.
 namespace RazorRockstars.Web
@@ -23,18 +22,28 @@ namespace RazorRockstars.Web
         {
             Plugins.Add(new RazorFormat());
             Plugins.Add(new MsgPackFormat());
+            Plugins.Add(new SwaggerFeature());
+
+            typeof(Resources)
+                .AddAttributes(new RestrictAttribute { VisibilityTo = RequestAttributes.None });
+            typeof(ResourceRequest)
+                .AddAttributes(new RestrictAttribute { VisibilityTo = RequestAttributes.None });
+
+            var metadata = (MetadataFeature)Plugins.First(x => x is MetadataFeature);
+            metadata.IndexPageFilter = page => {
+                page.OperationNames.Sort((x,y) => y.CompareTo(x));
+            };
 
             container.Register<IDbConnectionFactory>(
-                new OrmLiteConnectionFactory(":memory:", false, SqliteDialect.Provider));
+                new OrmLiteConnectionFactory(":memory:", SqliteDialect.Provider));
 
             InitData(container);
 
-            SetConfig(new EndpointHostConfig {
+            SetConfig(new HostConfig {
                 DebugMode = true,
-                CustomHttpHandlers = {
-                  { HttpStatusCode.ExpectationFailed, new RazorHandler("/expectationfailed") }
-                }
             });
+
+            this.CustomErrorHttpHandlers[HttpStatusCode.ExpectationFailed] = new RazorHandler("/expectationfailed");
         }
 
         public static void InitData(Container container)
@@ -109,8 +118,21 @@ namespace RazorRockstars.Web
         public string Name { get; set; }
     }
 
+    [FallbackRoute("/{Path}")]
+    public class Fallback
+    {
+        public string Path { get; set; }
+        public string PathInfo { get; set; }
+    }
+
     public class RockstarsService : Service
     {
+        public object Any(Fallback request)
+        {
+            request.PathInfo = base.Request.PathInfo;
+            return request;
+        }
+
         public object Get(Rockstars request)
         {
             if (request.Delete == "reset")
@@ -126,7 +148,7 @@ namespace RazorRockstars.Web
             var response = new RockstarsResponse
             {
                 Aged = request.Age,
-                Total = Db.GetScalar<int>("select count(*) from Rockstar"),
+                Total = Db.Scalar<int>("select count(*) from Rockstar"),
                 Results = request.Id != default(int) ?
                     Db.Select<Rockstar>(q => q.Id == request.Id)
                       : request.Age.HasValue ?
@@ -146,7 +168,7 @@ namespace RazorRockstars.Web
 
         public object Post(Rockstars request)
         {
-            Db.Insert(request.TranslateTo<Rockstar>());
+            Db.Insert(request.ConvertTo<Rockstar>());
             return Get(new Rockstars());
         }
     }

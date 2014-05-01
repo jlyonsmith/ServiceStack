@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.Serialization;
 using DeliveryService.Model.Types;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.ServiceModel;
+using ServiceStack;
 
 namespace DeliveryService.Model.Operations
 {
@@ -51,9 +49,9 @@ namespace DeliveryService.Model.Operations
 		public ResponseStatus ResponseStatus { get; set; }
 	}
 
-	public class RouteInfoService : ServiceBase<RouteInfo>
+	public class RouteInfoService : Service
 	{
-		protected override object Run(RouteInfo request)
+        public object Any(RouteInfo request)
 		{
 			throw new NotImplementedException();
 		}

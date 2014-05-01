@@ -1,6 +1,5 @@
 ﻿using System.Web;
-using ServiceStack.WebHost.Endpoints;
-using ServiceStack.WebHost.Endpoints.Support;
+using ServiceStack.Host.Handlers;
 
 namespace ServiceStack
 {
@@ -9,6 +8,9 @@ namespace ServiceStack
         public void Register(IAppHost appHost)
         {
             appHost.CatchAllHandlers.Add(ProcessRequest);
+
+            appHost.GetPlugin<MetadataFeature>()
+                .AddDebugLink("?debug=requestinfo", "Request Info");
         }
 
         public IHttpHandler ProcessRequest(string httpMethod, string pathInfo, string filePath)

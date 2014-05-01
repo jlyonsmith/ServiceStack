@@ -1,9 +1,6 @@
 ﻿using System.Collections.Generic;
+using ServiceStack.Auth;
 using ServiceStack.OrmLite;
-using ServiceStack.ServiceHost;
-using ServiceStack.ServiceInterface;
-using ServiceStack.ServiceInterface.Auth;
-using ServiceStack.ServiceInterface.ServiceModel;
 
 namespace ServiceStack.WebHost.IntegrationTests.Services
 {
@@ -18,26 +15,24 @@ namespace ServiceStack.WebHost.IntegrationTests.Services
 		public UserAuthsResponse()
 		{
 			this.Results = new List<UserAuth>();
-			this.OAuthProviders = new List<UserOAuthProvider>();
+			this.OAuthProviders = new List<UserAuthDetails>();
 		}
 
 		public List<UserAuth> Results { get; set; }
 
-		public List<UserOAuthProvider> OAuthProviders { get; set; }
+		public List<UserAuthDetails> OAuthProviders { get; set; }
 
 		public ResponseStatus ResponseStatus { get; set; }
 	}
 
 	//Implementation. Can be called via any endpoint or format, see: http://servicestack.net/ServiceStack.Hello/
-	public class UserAuthsService : ServiceBase<UserAuths>
+	public class UserAuthsService : Service
 	{
-		public IDbConnectionFactory DbFactory { get; set; }
-
-		protected override object Run(UserAuths request)
+        public object Any(UserAuths request)
 		{
 			return new UserAuthsResponse {
-				Results = DbFactory.Run(db => db.Select<UserAuth>()),
-				OAuthProviders = DbFactory.Run(db => db.Select<UserOAuthProvider>()),
+				Results = Db.Select<UserAuth>(),
+				OAuthProviders = Db.Select<UserAuthDetails>(),
 			};
 		}
 	}

@@ -1,14 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Linq;
 using ServiceStack.Text;
 
 namespace ServiceStack.Configuration
 {
-    public class AppSettingsBase : IResourceManager
+    public delegate string ParsingStrategyDelegate(string originalSetting);
+
+    public class AppSettingsBase : IAppSettings
     {
         protected ISettings settings;
-        const string ErrorAppsettingNotFound = "Unable to find App Setting: {0}";
+        protected const string ErrorAppsettingNotFound = "Unable to find App Setting: {0}";
+
+        public string Tier { get; set; }
+
+        public ParsingStrategyDelegate ParsingStrategy { get; set; }
 
         public AppSettingsBase(ISettings settings=null)
         {
@@ -17,10 +24,21 @@ namespace ServiceStack.Configuration
 
         public virtual string GetNullableString(string name)
         {
-            return settings.Get(name);
+            var value = Tier != null
+                ? settings.Get("{0}.{1}".Fmt(Tier, name)) ?? settings.Get(name)
+                : settings.Get(name);
+
+            return ParsingStrategy != null
+                ? ParsingStrategy(value)
+                : value;
         }
 
         public virtual string GetString(string name)
+        {
+            return GetNullableString(name);
+        }
+
+        public virtual string GetRequiredString(string name)
         {
             var value = GetNullableString(name);
             if (value == null)
@@ -34,7 +52,9 @@ namespace ServiceStack.Configuration
         public virtual IList<string> GetList(string key)
         {
             var value = GetString(key);
-            return ConfigUtils.GetListFromAppSettingValue(value);
+            return value == null 
+                ? new List<string>() 
+                : ConfigUtils.GetListFromAppSettingValue(value);
         }
 
         public virtual IDictionary<string, string> GetDictionary(string key)
@@ -58,10 +78,13 @@ namespace ServiceStack.Configuration
         {
             var stringValue = GetNullableString(name);
 
-            T deserializedValue;
+            T ret = defaultValue;
             try
             {
-                deserializedValue = TypeSerializer.DeserializeFromString<T>(stringValue);
+                if (stringValue != null)
+                {
+                    ret = TypeSerializer.DeserializeFromString<T>(stringValue);
+                }
             }
             catch (Exception ex)
             {
@@ -72,9 +95,20 @@ namespace ServiceStack.Configuration
                 throw new ConfigurationErrorsException(message, ex);
             }
 
-            return stringValue != null
-                       ? deserializedValue
-                       : defaultValue;
+            return ret;
+        }
+    }
+
+    public static class AppSettingsStrategy
+    {
+        public static string CollapseNewLines(string originalSetting)
+        {
+            if (originalSetting == null) return null;
+
+            var lines = originalSetting.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
+            return lines.Length > 1 
+                ? string.Join("", lines.Select(x => x.Trim())) 
+                : originalSetting;
         }
     }
 }

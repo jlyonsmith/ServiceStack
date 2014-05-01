@@ -1,12 +1,11 @@
 using System;
 using NUnit.Framework;
-using ServiceStack.ServiceClient.Web;
 
 namespace ServiceStack.WebHost.Endpoints.Tests.Support
 {
 	public abstract class ServiceClientTestBase : IDisposable
 	{
-		private const string BaseUrl = "http://127.0.0.1:8083/";
+	    protected const string BaseUrl = "http://127.0.0.1:8083/";
 
 		private AppHostHttpListenerBase appHost;
 
@@ -30,7 +29,6 @@ namespace ServiceStack.WebHost.Endpoints.Tests.Support
 		{
 			if (appHost == null) return;
 			appHost.Dispose();
-			appHost = null;
 		}
 
 		public void Send<TRes>(object request, Action<TRes> validate)

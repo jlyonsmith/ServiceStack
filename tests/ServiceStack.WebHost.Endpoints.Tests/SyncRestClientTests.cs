@@ -1,13 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Net;
 using NUnit.Framework;
-using ServiceStack.Common.Extensions;
 using ServiceStack.Logging;
-using ServiceStack.Logging.Support.Logging;
-using ServiceStack.Service;
-using ServiceStack.ServiceClient.Web;
-using ServiceStack.ServiceModel.Serialization;
+using ServiceStack.Serialization;
 using ServiceStack.Text;
 using ServiceStack.WebHost.Endpoints.Tests.Support.Host;
 
@@ -46,9 +41,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
         public void Dispose()
         {
-            if (appHost == null) return;
             appHost.Dispose();
-            appHost = null;
         }
 
         protected abstract IRestClient CreateRestClient();
@@ -126,8 +119,8 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             try
             {
                 var xml = "<MovieResponse xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"http://schemas.servicestack.net/types\"><Movie><Director>Edward Zwick</Director><Genres xmlns:d3p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\"><d3p1:string>Adventure</d3p1:string><d3p1:string>Drama</d3p1:string><d3p1:string>Thriller</d3p1:string></Genres><Id>6</Id><ImdbId>tt0450259</ImdbId><Rating>8</Rating><ReleaseDate>2007-01-26T00:00:00+00:00</ReleaseDate><TagLine>A fisherman, a smuggler, and a syndicate of businessmen match wits over the possession of a priceless diamond.</TagLine><Title>Blood Diamond</Title></Movie></MovieResponse>";
-                var response = DataContractDeserializer.Instance.Parse<MovieResponse>(xml);
-                var toXml = DataContractSerializer.Instance.Parse(response);
+                var response = DataContractSerializer.Instance.DeserializeFromString<MovieResponse>(xml);
+                var toXml = DataContractSerializer.Instance.SerializeToString(response);
                 Console.WriteLine("XML: " + toXml);
             }
             catch (Exception ex)
@@ -177,9 +170,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                 }
             };
 
-            var response = client.Put<InboxPostResponseRequestResponse>(
-                "inbox/123/responses",
-                request);
+            var response = client.Put<InboxPostResponseRequestResponse>("inbox/123/responses", request);
 
             Assert.That(response.Id, Is.EqualTo(request.Id));
             Assert.That(response.Responses[0].PageElementId,
@@ -193,9 +184,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
             try
             {
-                var response = client.Put<InboxPostResponseRequestResponse>(
-                    "inbox/123/responses",
-                    new InboxPostResponseRequest());
+                var response = client.Put<InboxPostResponseRequestResponse>("inbox/123/responses", new InboxPostResponseRequest());
 
                 response.PrintDump();
 
@@ -214,9 +203,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
             try
             {
-                var response = client.Put<InboxPost>(
-                    "inbox/123/responses",
-                    new InboxPost { Throw = true });
+                var response = client.Put<InboxPost>("inbox/123/responses", new InboxPost { Throw = true });
 
                 response.PrintDump();
 
@@ -246,14 +233,14 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         {
             var isActioncalledGlobal = false;
             var isActioncalledLocal = false;
-            ServiceClientBase.HttpWebResponseFilter = r => isActioncalledGlobal = true;
+            ServiceClientBase.GlobalResponseFilter = r => isActioncalledGlobal = true;
             var restClient = (JsonServiceClient)CreateRestClient();
-            restClient.LocalHttpWebResponseFilter = r => isActioncalledLocal = true;
+            restClient.ResponseFilter = r => isActioncalledLocal = true;
             restClient.Get<MoviesResponse>("movies");
             Assert.That(isActioncalledGlobal, Is.True);
             Assert.That(isActioncalledLocal, Is.True);
 
-            ServiceClientBase.HttpWebResponseFilter = null;
+            ServiceClientBase.GlobalResponseFilter = null;
         }
     }
 
@@ -261,7 +248,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
     public class JsvSyncRestClientTests : SyncRestClientTests
     {
         public JsvSyncRestClientTests()
-            : base(8091)
+            : base(8093)
         {
         }
 

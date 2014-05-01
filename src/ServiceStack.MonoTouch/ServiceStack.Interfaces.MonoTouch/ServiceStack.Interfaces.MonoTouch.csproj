@@ -32,6 +32,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
     <Reference Include="monotouch" />
@@ -330,6 +331,12 @@
     <Compile Include="..\..\ServiceStack.Interfaces\Messaging\UnRetryableMessagingException.cs">
       <Link>Messaging\UnRetryableMessagingException.cs</Link>
     </Compile>
+    <Compile Include="..\..\ServiceStack.Interfaces\OrmLite\DbConnectionFactory.cs">
+      <Link>OrmLite\DbConnectionFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\ServiceStack.Interfaces\OrmLite\IDbConnectionFactory.cs">
+      <Link>OrmLite\IDbConnectionFactory.cs</Link>
+    </Compile>
     <Compile Include="..\..\ServiceStack.Interfaces\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
@@ -593,6 +600,9 @@
     </Compile>
     <Compile Include="..\..\ServiceStack.Interfaces\ServiceInterface.ServiceModel\IResponseStatusConvertible.cs">
       <Link>ServiceInterface.ServiceModel\IResponseStatusConvertible.cs</Link>
+    </Compile>
+    <Compile Include="..\..\ServiceStack.Interfaces\Service\IPartialWriter.cs">
+      <Link>Service\IPartialWriter.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>
