@@ -32,7 +32,16 @@ namespace ServiceStack.Web
         /// </summary>
         object Dto { get; set; }
 
+        /// <summary>
+        /// Write once to the Response Stream then close it. 
+        /// </summary>
+        /// <param name="text"></param>
         void Write(string text);
+
+        /// <summary>
+        /// Buffer the Response OutputStream so it can be written in 1 batch
+        /// </summary>
+        bool UseBufferedStream { get; set; }
 
         /// <summary>
         /// Signal that this response has been handled and no more processing should be done.
@@ -57,5 +66,7 @@ namespace ServiceStack.Web
         bool IsClosed { get; }
 
         void SetContentLength(long contentLength);
+
+        bool KeepAlive { get; set; }
     }
 }

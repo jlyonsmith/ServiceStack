@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -11,7 +11,7 @@
     <RootNamespace>ServiceStack</RootNamespace>
     <AssemblyName>ServiceStack.Interfaces</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <TargetFrameworkProfile>Profile158</TargetFrameworkProfile>
+    <TargetFrameworkProfile>Profile136</TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{786C830F-07A1-408B-BD7F-6EE04809D6DB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
   </PropertyGroup>
@@ -37,6 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributeBase.cs" />
+    <Compile Include="Auth\IUserAuth.cs" />
     <Compile Include="Caching\ICacheClient.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -70,6 +71,7 @@
     <Compile Include="DataAnnotations\ComputeAttribute.cs" />
     <Compile Include="DataAnnotations\CustomFieldAttribute.cs" />
     <Compile Include="DataAnnotations\DescriptionAttribute.cs" />
+    <Compile Include="DataAnnotations\ExcludeAttribute.cs" />
     <Compile Include="DataAnnotations\PostCreateTableAttribute.cs" />
     <Compile Include="DataAnnotations\PostDropTableAttribute.cs" />
     <Compile Include="DataAnnotations\PreCreateTableAttribute.cs" />
@@ -123,7 +125,9 @@
     <Compile Include="Commands\ICommand.Generic.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Data\OptimisticConcurrencyException.cs" />
     <Compile Include="IO\IEndpoint.cs" />
+    <Compile Include="IQuery.cs" />
     <Compile Include="IRestGateway.cs" />
     <Compile Include="Logging\DebugLogFactory.cs" />
     <Compile Include="Logging\DebugLogger.cs" />

@@ -80,6 +80,7 @@
     <Compile Include="Benchmarks\RedisMqServerBenchmarks.cs" />
     <Compile Include="Benchmarks\RedisMqServerServerBenchmarks.cs" />
     <Compile Include="Messaging\MqNameTests.cs" />
+    <Compile Include="Messaging\MqRequestReplyTests.cs" />
     <Compile Include="Messaging\MqServerIntroTests.cs" />
     <Compile Include="Messaging\RabbitMqServerTests.cs" />
     <Compile Include="Messaging\InMemoryTransientMessagingHostTests.cs" />
@@ -134,7 +135,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

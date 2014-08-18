@@ -15,7 +15,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
     [TestFixture]
     public class AppHostListenerBaseTests
     {
-        private const string ListeningOn = "http://localhost:82/";
+        private const string ListeningOn = "http://localhost:1337/";
         ServiceStackHost appHost;
 
         static AppHostListenerBaseTests()
@@ -138,7 +138,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             var client = new JsonServiceClient(ListeningOn);
             try
             {
-                var response = client.Put<MoviesZipResponse>("movies.zip", new MoviesZip());
+                var response = client.Put<MoviesZipResponse>("all-movies.zip", new MoviesZip());
                 Assert.Fail("Should throw 405 excetpion");
             }
             catch (WebServiceException ex)
@@ -157,7 +157,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             webReq.Accept = "*/*";
             using (var webRes = webReq.GetResponse())
             {
-                Assert.That(webRes.ContentType, Is.StringStarting(MimeTypes.Json));
+                Assert.That(webRes.ContentType, Is.StringStarting(MimeTypes.JavaScript));
                 response = webRes.ReadToEnd();
             }
 

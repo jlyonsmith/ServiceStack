@@ -8,7 +8,6 @@ using System.Xml.Linq;
 using MarkdownSharp;
 using ServiceStack.Configuration;
 using ServiceStack.Host;
-using ServiceStack.Host.Handlers;
 using ServiceStack.Logging;
 using ServiceStack.Markdown;
 using ServiceStack.Metadata;
@@ -36,10 +35,10 @@ namespace ServiceStack
         {
             var config = new HostConfig
             {
-                MetadataTypesConfig = new MetadataTypesConfig(addDefaultXmlNamespace: DefaultWsdlNamespace),
                 WsdlServiceNamespace = DefaultWsdlNamespace,
                 ApiVersion = "1.0",
-                EmbeddedResourceSources = new[] { HostContext.AppHost.GetType().Assembly, typeof(Service).Assembly }.ToList(),
+                EmbeddedResourceSources = new List<Assembly>(),
+                EmbeddedResourceBaseTypes = new[] { HostContext.AppHost.GetType(), typeof(Service) }.ToList(),
                 LogFactory = new NullLogFactory(),
                 EnableAccessRestrictions = true,
                 WebHostPhysicalPath = "~".MapServerPath(),
@@ -74,7 +73,7 @@ namespace ServiceStack
                     "js", "css", "htm", "html", "shtm", "txt", "xml", "rss", "csv", "pdf",  
                     "jpg", "jpeg", "gif", "png", "bmp", "ico", "tif", "tiff", "svg",
                     "avi", "divx", "m3u", "mov", "mp3", "mpeg", "mpg", "qt", "vob", "wav", "wma", "wmv", 
-                    "flv", "xap", "xaml", "ogg", "mp4", "webm", "eot", "ttf", "woff"
+                    "flv", "swf", "xap", "xaml", "ogg", "mp4", "webm", "eot", "ttf", "woff", "map"
                 },
                 DebugAspNetHostEnvironment = Env.IsMono ? "FastCGI" : "IIS7",
                 DebugHttpListenerHostEnvironment = Env.IsMono ? "XSP" : "WebServer20",
@@ -111,7 +110,7 @@ namespace ServiceStack
                     "/bin/",
                 },
                 IgnoreWarningsOnPropertyNames = new List<string> {
-                    "format", "callback", "debug", "_", "authsecret"
+                    "format", "callback", "debug", "_", "authsecret", "Version", "version"
                 }
             };
 
@@ -128,10 +127,10 @@ namespace ServiceStack
             if (instance == null) return;
 
             //Get a copy of the singleton already partially configured
-            this.MetadataTypesConfig = instance.MetadataTypesConfig;
             this.WsdlServiceNamespace = instance.WsdlServiceNamespace;
             this.ApiVersion = instance.ApiVersion;
             this.EmbeddedResourceSources = instance.EmbeddedResourceSources;
+            this.EmbeddedResourceBaseTypes = instance.EmbeddedResourceBaseTypes;
             this.EnableAccessRestrictions = instance.EnableAccessRestrictions;
             this.ServiceEndpointsMetadataConfig = instance.ServiceEndpointsMetadataConfig;
             this.LogFactory = instance.LogFactory;
@@ -177,7 +176,6 @@ namespace ServiceStack
             this.AdminAuthSecret = instance.AdminAuthSecret;
         }
 
-        public MetadataTypesConfig MetadataTypesConfig { get; set; }
         public string WsdlServiceNamespace { get; set; }
         public string ApiVersion { get; set; }
 
@@ -188,6 +186,7 @@ namespace ServiceStack
             set { metadataVisibility = value.ToAllowedFlagsSet(); }
         }
 
+        public List<Type> EmbeddedResourceBaseTypes { get; set; }
         public List<Assembly> EmbeddedResourceSources { get; set; }
 
         public string SoapServiceName { get; set; }

@@ -5,7 +5,7 @@
 // Authors:
 //   Demis Bellot (demis.bellot@gmail.com)
 //
-// Copyright 2013 Service Stack LLC. All Rights Reserved.
+// Copyright 2014 Service Stack LLC. All Rights Reserved.
 //
 // Licensed under the same terms of ServiceStack.
 //
@@ -52,6 +52,7 @@ namespace ServiceStack.Redis
         bool SetEntryIfNotExists(string key, string value);
         void SetAll(IEnumerable<string> keys, IEnumerable<string> values);
         void SetAll(Dictionary<string, string> map);
+        string GetEntry(string key);
         string GetValue(string key);
         string GetAndSetEntry(string key, string value);
         List<string> GetValues(List<string> keys);

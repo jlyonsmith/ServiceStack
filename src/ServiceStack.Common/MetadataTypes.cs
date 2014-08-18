@@ -1,11 +1,11 @@
+using System;
 using System.Collections.Generic;
+using ServiceStack.DataAnnotations;
 
 namespace ServiceStack
 {
     public class MetadataTypesConfig
     {
-        public MetadataTypesConfig() {}
-
         public MetadataTypesConfig(
             string baseUrl = null,
             bool makePartial = true,
@@ -13,11 +13,11 @@ namespace ServiceStack
             bool addReturnMarker = true,
             bool convertDescriptionToComments = true,
             bool addDataContractAttributes = false,
-            bool makeDataContractsExtensible = false,
             bool addIndexesToDataMembers = false,
             string addDefaultXmlNamespace = null,
-            bool initializeCollections = true,
             bool addResponseStatus = false,
+            bool makeDataContractsExtensible = false,
+            bool initializeCollections = true,
             int? addImplicitVersion = null)
         {
             BaseUrl = baseUrl;
@@ -32,17 +32,6 @@ namespace ServiceStack
             InitializeCollections = initializeCollections;
             AddResponseStatus = addResponseStatus;
             AddImplicitVersion = addImplicitVersion;
-
-            DefaultNamespaces = new List<string> 
-            {
-                "System",
-                "System.Collections",
-                "System.ComponentModel",
-                "System.Collections.Generic",
-                "System.Runtime.Serialization",
-                "ServiceStack.ServiceHost",
-                "ServiceStack.ServiceInterface.ServiceModel",
-            };
         }
 
         public string BaseUrl { get; set; }
@@ -51,36 +40,21 @@ namespace ServiceStack
         public bool AddReturnMarker { get; set; }
         public bool AddDescriptionAsComments { get; set; }
         public bool AddDataContractAttributes { get; set; }
-        public bool MakeDataContractsExtensible { get; set; }
         public bool AddIndexesToDataMembers { get; set; }
-        public bool InitializeCollections { get; set; }
         public int? AddImplicitVersion { get; set; }
         public bool AddResponseStatus { get; set; }
         public string AddDefaultXmlNamespace { get; set; }
+        public bool MakeDataContractsExtensible { get; set; }
+        public bool InitializeCollections { get; set; }
         public List<string> DefaultNamespaces { get; set; }
 
-
-        public MetadataTypesConfig Clone()
-        {
-            return new MetadataTypesConfig
-            {
-                BaseUrl = BaseUrl,
-                MakePartial = MakePartial,
-                MakeVirtual = MakeVirtual,
-                AddReturnMarker = AddReturnMarker,
-                AddDescriptionAsComments = AddDescriptionAsComments,
-                AddDataContractAttributes = AddDataContractAttributes,
-                MakeDataContractsExtensible = MakeDataContractsExtensible,
-                AddIndexesToDataMembers = AddIndexesToDataMembers,
-                InitializeCollections = InitializeCollections,
-                AddImplicitVersion = AddImplicitVersion,
-                AddResponseStatus = AddResponseStatus,
-                AddDefaultXmlNamespace = AddDefaultXmlNamespace,
-                DefaultNamespaces = DefaultNamespaces,
-            };
-        }
+        public Dictionary<string, string> TypeAlias { get; set; }
+        public HashSet<Type> IgnoreTypes { get; set; }
+        public HashSet<Type> ExportAttributes { get; set; }
+        public List<string> IgnoreTypesInNamespaces { get; set; }
     }
 
+    [Exclude(Feature.Soap)]
     public class MetadataTypes
     {
         public MetadataTypes()
@@ -108,18 +82,30 @@ namespace ServiceStack
         public string Name { get; set; }
         public string Namespace { get; set; }
         public string[] GenericArgs { get; set; }
-        public string Inherits { get; set; }
-        public string[] InheritsGenericArgs { get; set; }
+        public MetadataTypeName Inherits { get; set; }
         public string Description { get; set; }
         public bool ReturnVoidMarker { get; set; }
-        public string[] ReturnMarkerGenericArgs { get; set; }
+
+        public MetadataTypeName ReturnMarkerTypeName { get; set; }
 
         public List<MetadataRoute> Routes { get; set; }
+
         public MetadataDataContract DataContract { get; set; }
 
         public List<MetadataPropertyType> Properties { get; set; }
 
         public List<MetadataAttribute> Attributes { get; set; }
+
+        public string GetFullName()
+        {
+            return Namespace + "." + Name;
+        }
+    }
+
+    public class MetadataTypeName
+    {
+        public string Name { get; set; }
+        public string[] GenericArgs { get; set; }
     }
 
     public class MetadataRoute
@@ -152,6 +138,7 @@ namespace ServiceStack
         public string Value { get; set; }
         public string Description { get; set; }
         public MetadataDataMember DataMember { get; set; }
+        public bool? ReadOnly { get; set; }
 
         public List<MetadataAttribute> Attributes { get; set; }
     }

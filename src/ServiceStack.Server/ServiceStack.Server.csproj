@@ -79,6 +79,7 @@
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
+    <Reference Include="System.Net" />
     <Reference Include="System.Runtime.Serialization">
       <RequiredTargetFramework>3.0</RequiredTargetFramework>
     </Reference>
@@ -99,6 +100,7 @@
     <Compile Include="Auth\OrmLiteAuthRepository.cs" />
     <Compile Include="Caching\OrmLiteCacheClient.cs" />
     <Compile Include="Configuration\OrmLiteAppSettings.cs" />
+    <Compile Include="AutoQueryFeature.cs" />
     <Compile Include="Messaging\Redis\MessageHandlerWorker.cs" />
     <Compile Include="Messaging\Rcon\Client.cs" />
     <Compile Include="Messaging\Rcon\Packet.cs" />
@@ -142,7 +144,9 @@
       <Name>ServiceStack</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Data\" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

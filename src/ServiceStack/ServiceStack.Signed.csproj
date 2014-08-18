@@ -79,6 +79,7 @@
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
     <Reference Include="System.Data" />
+    <Reference Include="System.Net" />
     <Reference Include="System.Runtime.Serialization">
       <RequiredTargetFramework>3.0</RequiredTargetFramework>
     </Reference>
@@ -100,14 +101,22 @@
     <Compile Include="AppHostHttpListenerSmartPoolBase.cs" />
     <Compile Include="AppSelfHostBase.cs" />
     <Compile Include="AsyncExtensions.cs" />
+    <Compile Include="Auth\AspNetWindowsAuthProvider.cs" />
+    <Compile Include="Auth\OdnoklassnikiAuthProvider.cs" />
+    <Compile Include="Auth\AuthMetadataProvider.cs" />
+    <Compile Include="Auth\VkAuthProvider.cs" />
+    <Compile Include="Auth\YandexAuthProvider.cs" />
+    <Compile Include="Auth\GithubAuthProvider.cs" />
     <Compile Include="Auth\SocialExtensions.cs" />
     <Compile Include="Auth\UserAuthRepositoryExtensions.cs" />
     <Compile Include="CompressedFileResult.cs" />
     <Compile Include="CompressedResult.cs" />
     <Compile Include="Configuration\TextFileSettings.cs" />
-    <Compile Include="DtoGenFeature.cs" />
-    <Compile Include="DtoGen\CSharpGenerator.cs" />
-    <Compile Include="DtoGen\StringBuilderWrapper.cs" />
+    <Compile Include="NativeTypesFeature.cs" />
+    <Compile Include="NativeTypes\NativeTypesMetadata.cs" />
+    <Compile Include="NativeTypes\NativeTypesService.cs" />
+    <Compile Include="NativeTypes\CSharp\CSharpGenerator.cs" />
+    <Compile Include="NativeTypes\StringBuilderWrapper.cs" />
     <Compile Include="EnsureHttpsAttribute.cs" />
     <Compile Include="Host\ContentTypes.cs" />
     <Compile Include="Host\Handlers\CustomActionHandler.cs" />
@@ -124,7 +133,9 @@
     <Compile Include="Messaging\WorkerStatus.cs" />
     <Compile Include="MqExtensions.cs" />
     <Compile Include="ILogic.cs" />
+    <Compile Include="PostmanFeature.cs" />
     <Compile Include="RequestContext.cs" />
+    <Compile Include="ServerEventsFeature.cs" />
     <Compile Include="SmartThreadPool\CallerThreadContext.cs" />
     <Compile Include="SmartThreadPool\CanceledWorkItemsGroup.cs" />
     <Compile Include="SmartThreadPool\EventWaitHandle.cs" />
@@ -150,7 +161,7 @@
     <Compile Include="SmartThreadPool\WorkItemsGroupBase.cs" />
     <Compile Include="SmartThreadPool\WorkItemsQueue.cs" />
     <Compile Include="StopExecutionException.cs" />
-    <Compile Include="TaskExtensions.cs" />
+    <Compile Include="TaskExt.cs" />
     <Compile Include="Host\HttpResponseStreamWrapper.cs" />
     <Compile Include="HttpError.cs" />
     <Compile Include="HttpResult.cs" />
@@ -321,7 +332,6 @@
     <Compile Include="Html\ViewContext.cs" />
     <Compile Include="HttpExtensions.cs" />
     <Compile Include="IServiceBase.cs" />
-    <Compile Include="Metadata\MetadataTypesHandler.cs" />
     <Compile Include="PredefinedRoutesFeature.cs" />
     <Compile Include="Funq\Action.cs" />
     <Compile Include="Funq\Container.cs" />

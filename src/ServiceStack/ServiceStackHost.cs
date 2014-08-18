@@ -22,7 +22,9 @@ using ServiceStack.Logging;
 using ServiceStack.Messaging;
 using ServiceStack.Metadata;
 using ServiceStack.MiniProfiler.UI;
+using ServiceStack.NativeTypes;
 using ServiceStack.Serialization;
+using ServiceStack.Text;
 using ServiceStack.VirtualPath;
 using ServiceStack.Web;
 using ServiceStack.Redis;
@@ -58,12 +60,17 @@ namespace ServiceStack
             Metadata = new ServiceMetadata(RestPaths);
             PreRequestFilters = new List<Action<IRequest, IResponse>>();
             GlobalRequestFilters = new List<Action<IRequest, IResponse, object>>();
+            GlobalTypedRequestFilters = new Dictionary<Type, ITypedFilter>();
             GlobalResponseFilters = new List<Action<IRequest, IResponse, object>>();
+            GlobalTypedResponseFilters = new Dictionary<Type, ITypedFilter>();
             GlobalMessageRequestFilters = new List<Action<IRequest, IResponse, object>>();
+            GlobalTypedMessageRequestFilters = new Dictionary<Type, ITypedFilter>();
             GlobalMessageResponseFilters = new List<Action<IRequest, IResponse, object>>();
+            GlobalTypedMessageResponseFilters = new Dictionary<Type, ITypedFilter>();
             ViewEngines = new List<IViewEngine>();
             ServiceExceptionHandlers = new List<HandleServiceExceptionDelegate>();
             UncaughtExceptionHandlers = new List<HandleUncaughtExceptionDelegate>();
+            AfterInitCallbacks = new List<Action<IAppHost>>();
             RawHttpHandlers = new List<Func<IHttpRequest, IHttpHandler>> {
                  HttpHandlerFactory.ReturnRequestInfo,
                  MiniProfilerHandler.MatchesRequest,
@@ -81,6 +88,15 @@ namespace ServiceStack
                 new MarkdownFormat(),
                 new PredefinedRoutesFeature(),
                 new MetadataFeature(),
+                new NativeTypesFeature(),
+            };
+            ExcludeAutoRegisteringServiceTypes = new HashSet<Type> {
+                typeof(AuthenticateService),
+                typeof(RegisterService),
+                typeof(AssignRolesService),
+                typeof(UnAssignRolesService),
+                typeof(NativeTypesService),
+                typeof(PostmanService),
             };
         }
 
@@ -126,7 +142,11 @@ namespace ServiceStack
                 var pathProviders = new List<IVirtualPathProvider> {
                     new FileSystemVirtualPathProvider(this, Config.WebHostPhysicalPath)
                 };
-                pathProviders.AddRange(Config.EmbeddedResourceSources.Map(x =>
+
+                pathProviders.AddRange(Config.EmbeddedResourceBaseTypes.Distinct().Map(x =>
+                    new ResourceVirtualPathProvider(this, x)));
+
+                pathProviders.AddRange(Config.EmbeddedResourceSources.Distinct().Map(x =>
                     new ResourceVirtualPathProvider(this, x)));
 
                 VirtualPathProvider = pathProviders.Count > 1
@@ -147,11 +167,36 @@ namespace ServiceStack
             throw new NotImplementedException("Start(listeningAtUrlBase) is not supported by this AppHost");
         }
 
+        /// <summary>
+        /// Retain the same behavior as ASP.NET and redirect requests to directores 
+        /// without a trailing '/'
+        /// </summary>
+        public IHttpHandler RedirectDirectory(IHttpRequest request)
+        {
+            var dir = request.GetVirtualNode() as IVirtualDirectory;
+            if (dir != null)
+            {
+                if (!request.PathInfo.EndsWith("/"))
+                {
+                    return new RedirectHttpHandler
+                    {
+                        RelativeUrl = request.PathInfo + "/",
+                    };
+                }
+            }
+            return null;
+        }
+
         public string ServiceName { get; set; }
 
         public ServiceMetadata Metadata { get; set; }
 
         public ServiceController ServiceController { get; set; }
+
+        // Rare for a user to auto register all avaialable services in ServiceStack.dll
+        // But happens when ILMerged, so exclude autoregistering SS services by default 
+        // and let them register them manually
+        public HashSet<Type> ExcludeAutoRegisteringServiceTypes { get; set; }
 
         /// <summary>
         /// The AppHost.Container. Note: it is not thread safe to register dependencies after AppStart.
@@ -173,17 +218,27 @@ namespace ServiceStack
 
         public List<Action<IRequest, IResponse, object>> GlobalRequestFilters { get; set; }
 
+        public Dictionary<Type, ITypedFilter> GlobalTypedRequestFilters { get; set; }
+
         public List<Action<IRequest, IResponse, object>> GlobalResponseFilters { get; set; }
+
+        public Dictionary<Type, ITypedFilter> GlobalTypedResponseFilters { get; set; }
 
         public List<Action<IRequest, IResponse, object>> GlobalMessageRequestFilters { get; private set; }
 
+        public Dictionary<Type, ITypedFilter> GlobalTypedMessageRequestFilters { get; set; }
+
         public List<Action<IRequest, IResponse, object>> GlobalMessageResponseFilters { get; private set; }
+
+        public Dictionary<Type, ITypedFilter> GlobalTypedMessageResponseFilters { get; set; }
 
         public List<IViewEngine> ViewEngines { get; set; }
 
         public List<HandleServiceExceptionDelegate> ServiceExceptionHandlers { get; set; }
 
         public List<HandleUncaughtExceptionDelegate> UncaughtExceptionHandlers { get; set; }
+
+        public List<Action<IAppHost>> AfterInitCallbacks { get; set; }
 
         public List<Func<IHttpRequest, IHttpHandler>> RawHttpHandlers { get; set; }
 
@@ -345,7 +400,10 @@ namespace ServiceStack
                 Plugins.RemoveAll(x => x is PredefinedRoutesFeature);
 
             if ((Feature.Metadata & config.EnableFeatures) != Feature.Metadata)
+            {
                 Plugins.RemoveAll(x => x is MetadataFeature);
+                Plugins.RemoveAll(x => x is NativeTypesFeature);
+            }
 
             if ((Feature.RequestInfo & config.EnableFeatures) != Feature.RequestInfo)
                 Plugins.RemoveAll(x => x is RequestInfoFeature);
@@ -377,7 +435,7 @@ namespace ServiceStack
                     Container.Register<ICacheClient>(new MemoryCacheClient());
             }
 
-            if (Container.Exists<IMessageService>() 
+            if (Container.Exists<IMessageService>()
                 && !Container.Exists<IMessageFactory>())
             {
                 Container.Register(c => c.Resolve<IMessageService>().MessageFactory);
@@ -389,13 +447,24 @@ namespace ServiceStack
                 Container.Register<IAuthRepository>(c => c.Resolve<IUserAuthRepository>());
             }
 
+            foreach (var callback in AfterInitCallbacks)
+            {
+                try
+                {
+                    callback(this);
+                }
+                catch (Exception ex)
+                {
+                    OnStartupException(ex);
+                }
+            }
+
             ReadyAt = DateTime.UtcNow;
         }
 
         private void ConfigurePlugins()
         {
             //Some plugins need to initialize before other plugins are registered.
-
             foreach (var plugin in Plugins)
             {
                 var preInitPlugin = plugin as IPreInitPlugin;
@@ -424,6 +493,22 @@ namespace ServiceStack
             Config.PreferredContentTypes.Insert(0, Config.DefaultContentType);
 
             Config.PreferredContentTypesArray = Config.PreferredContentTypes.ToArray();
+
+            foreach (var plugin in Plugins)
+            {
+                var preInitPlugin = plugin as IPostInitPlugin;
+                if (preInitPlugin != null)
+                {
+                    try
+                    {
+                        preInitPlugin.AfterPluginsLoaded(this);
+                    }
+                    catch (Exception ex)
+                    {
+                        OnStartupException(ex);
+                    }
+                }
+            }
 
             ServiceController.AfterInit();
         }
@@ -596,6 +681,26 @@ namespace ServiceStack
             return wsdl;
         }
 
+        public void RegisterTypedRequestFilter<T>(Action<IRequest, IResponse, T> filterFn)
+        {
+            GlobalTypedRequestFilters[typeof(T)] = new TypedFilter<T>(filterFn);
+        }
+
+        public void RegisterTypedResponseFilter<T>(Action<IRequest, IResponse, T> filterFn)
+        {
+            GlobalTypedResponseFilters[typeof(T)] = new TypedFilter<T>(filterFn);
+        }
+
+        public void RegisterTypedMessageRequestFilter<T>(Action<IRequest, IResponse, T> filterFn)
+        {
+            GlobalTypedMessageRequestFilters[typeof(T)] = new TypedFilter<T>(filterFn);
+        }
+
+        public void RegisterTypedMessageResponseFilter<T>(Action<IRequest, IResponse, T> filterFn)
+        {
+            GlobalTypedMessageResponseFilters[typeof(T)] = new TypedFilter<T>(filterFn);
+        }
+
         public virtual void Dispose()
         {
             if (Container != null)
@@ -603,6 +708,8 @@ namespace ServiceStack
                 Container.Dispose();
                 Container = null;
             }
+
+            JsConfig.Reset(); //Clears Runtime Attributes
 
             Instance = null;
         }

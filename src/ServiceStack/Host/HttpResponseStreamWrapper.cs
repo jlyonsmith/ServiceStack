@@ -50,6 +50,8 @@ namespace ServiceStack.Host
             OutputStream.Write(bytes, 0, bytes.Length);
         }
 
+        public bool UseBufferedStream { get; set; }
+
         public void Close()
         {
             if (KeepOpen) return;
@@ -77,7 +79,9 @@ namespace ServiceStack.Host
         public bool IsClosed { get; private set; }
 
         public void SetContentLength(long contentLength) {}
-        
+
+        public bool KeepAlive { get; set; }
+
         public void SetCookie(Cookie cookie)
         {
         }

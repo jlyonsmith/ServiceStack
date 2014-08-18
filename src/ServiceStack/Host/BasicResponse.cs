@@ -51,6 +51,8 @@ namespace ServiceStack.Host
             ms.Write(bytes, 0, bytes.Length);
         }
 
+        public bool UseBufferedStream { get; set; }
+
         public void Close()
         {
             IsClosed = true;
@@ -70,5 +72,7 @@ namespace ServiceStack.Host
         public void SetContentLength(long contentLength)
         {
         }
+
+        public bool KeepAlive { get; set; }
     }
 }

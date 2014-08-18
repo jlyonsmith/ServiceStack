@@ -6,8 +6,6 @@ using DotNetOpenAuth.Messaging;
 using DotNetOpenAuth.OAuth2;
 using ServiceStack.Auth;
 using ServiceStack.Configuration;
-using ServiceStack.Text;
-using ServiceStack.Web;
 
 namespace ServiceStack.Authentication.OAuth2
 {
@@ -108,10 +106,13 @@ namespace ServiceStack.Authentication.OAuth2
                     tokens.AccessToken = accessToken;
                     tokens.RefreshToken = authState.RefreshToken;
                     tokens.RefreshTokenExpiry = authState.AccessTokenExpirationUtc;
-                    session.IsAuthenticated = true;
+
                     var authInfo = this.CreateAuthInfo(accessToken);
-                    this.OnAuthenticated(authService, session, tokens, authInfo);
-                    return authService.Redirect(session.ReferrerUrl.AddHashParam("s", "1"));
+
+                    session.IsAuthenticated = true;
+                    
+                    return OnAuthenticated(authService, session, tokens, authInfo)
+                        ?? authService.Redirect(session.ReferrerUrl.AddHashParam("s", "1"));
                 }
                 catch (WebException we)
                 {
@@ -168,6 +169,10 @@ namespace ServiceStack.Authentication.OAuth2
                 tokens.LastName = authInfo["last_name"];
                 tokens.Email = authInfo["email"];
                 userSession.UserAuthName = tokens.Email;
+
+                string profileUrl;
+                if (authInfo.TryGetValue("picture", out profileUrl))
+                    tokens.Items[AuthMetadataProvider.ProfileUrlKey] = profileUrl;
 
                 this.LoadUserOAuthProvider(userSession, tokens);
             }

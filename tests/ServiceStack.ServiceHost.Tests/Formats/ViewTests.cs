@@ -176,6 +176,8 @@ namespace ServiceStack.ServiceHost.Tests.Formats
                 MemoryStream.Write(bytes, 0, bytes.Length);
             }
 
+            public bool UseBufferedStream { get; set; }
+
             public string Contents { get; set; }
 
             public void Close()
@@ -201,6 +203,8 @@ namespace ServiceStack.ServiceHost.Tests.Formats
             {
                 Headers[HttpHeaders.ContentLength] = contentLength.ToString();
             }
+
+            public bool KeepAlive { get; set; }
 
             public void SetCookie(Cookie cookie)
             {                

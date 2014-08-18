@@ -47,6 +47,8 @@ namespace ServiceStack.Testing
             this.TextWritten.Append(text);
         }
 
+        public bool UseBufferedStream { get; set; }
+
         public void Close()
         {
             this.IsClosed = true;
@@ -82,6 +84,8 @@ namespace ServiceStack.Testing
         {
             Headers[HttpHeaders.ContentLength] = contentLength.ToString(CultureInfo.InvariantCulture);
         }
+
+        public bool KeepAlive { get; set; }
 
         public void SetCookie(Cookie cookie)
         {            
