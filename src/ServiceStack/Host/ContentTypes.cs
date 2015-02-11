@@ -99,7 +99,7 @@ namespace ServiceStack.Host
             if (this.ContentTypeSerializers.TryGetValue(contentType, out responseStreamWriter) ||
                 this.ContentTypeSerializers.TryGetValue(ContentFormat.GetRealContentType(contentType), out responseStreamWriter))
             {
-                using (var ms = new MemoryStream())
+                using (var ms = MemoryStreamFactory.GetStream())
                 {
                     responseStreamWriter(req, response, ms);
                     ms.Position = 0;
@@ -111,7 +111,7 @@ namespace ServiceStack.Host
             if (this.ContentTypeResponseSerializers.TryGetValue(contentType, out responseWriter) ||
                 this.ContentTypeResponseSerializers.TryGetValue(ContentFormat.GetRealContentType(contentType), out responseWriter))
             {
-                using (var ms = new MemoryStream())
+                using (var ms = MemoryStreamFactory.GetStream())
                 {
                     var httpRes = new HttpResponseStreamWrapper(ms);
                     responseWriter(req, response, httpRes);
@@ -150,7 +150,7 @@ namespace ServiceStack.Host
             if (this.ContentTypeSerializers.TryGetValue(contentType, out responseStreamWriter) ||
                 this.ContentTypeSerializers.TryGetValue(ContentFormat.GetRealContentType(contentType), out responseStreamWriter))
             {
-                using (var ms = new MemoryStream())
+                using (var ms = MemoryStreamFactory.GetStream())
                 {
                     responseStreamWriter(req, response, ms);
 
@@ -164,9 +164,8 @@ namespace ServiceStack.Host
             if (this.ContentTypeResponseSerializers.TryGetValue(contentType, out responseWriter) ||
                 this.ContentTypeResponseSerializers.TryGetValue(ContentFormat.GetRealContentType(contentType), out responseWriter))
             {
-                using (var ms = new MemoryStream())
+                using (var ms = MemoryStreamFactory.GetStream())
                 {
-
                     var httpRes = new HttpResponseStreamWrapper(ms) {
                         KeepOpen = true, //Don't let view engines close the OutputStream
                     };
@@ -174,8 +173,6 @@ namespace ServiceStack.Host
 
                     var bytes = ms.ToArray();
                     var result = bytes.FromUtf8Bytes();
-
-                    httpRes.ForceClose(); //Manually close the OutputStream
 
                     return result;
                 }
@@ -210,7 +207,9 @@ namespace ServiceStack.Host
             if (serializer == null)
                 throw new NotSupportedException("ContentType not supported: " + contentType);
 
-            var httpRes = new HttpResponseStreamWrapper(responseStream);
+            var httpRes = new HttpResponseStreamWrapper(responseStream) {
+                Dto = requestContext.Response.Dto
+            };
             serializer(requestContext, response, httpRes);
         }
 

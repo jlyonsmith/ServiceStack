@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Web.Configuration;
+using System.Xml;
 using System.Xml.Linq;
 using MarkdownSharp;
 using ServiceStack.Configuration;
@@ -39,6 +41,7 @@ namespace ServiceStack
                 ApiVersion = "1.0",
                 EmbeddedResourceSources = new List<Assembly>(),
                 EmbeddedResourceBaseTypes = new[] { HostContext.AppHost.GetType(), typeof(Service) }.ToList(),
+                EmbeddedResourceTreatAsFiles = new HashSet<string>(),
                 LogFactory = new NullLogFactory(),
                 EnableAccessRestrictions = true,
                 WebHostPhysicalPath = "~".MapServerPath(),
@@ -70,10 +73,10 @@ namespace ServiceStack
                 IgnoreFormatsInMetadata = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 AllowFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    "js", "css", "htm", "html", "shtm", "txt", "xml", "rss", "csv", "pdf",  
+                    "js", "ts", "jsx", "css", "htm", "html", "shtm", "txt", "xml", "rss", "csv", "pdf",  
                     "jpg", "jpeg", "gif", "png", "bmp", "ico", "tif", "tiff", "svg",
                     "avi", "divx", "m3u", "mov", "mp3", "mpeg", "mpg", "qt", "vob", "wav", "wma", "wmv", 
-                    "flv", "swf", "xap", "xaml", "ogg", "mp4", "webm", "eot", "ttf", "woff", "map"
+                    "flv", "swf", "xap", "xaml", "ogg", "mp4", "webm", "eot", "ttf", "woff", "woff2", "map"
                 },
                 DebugAspNetHostEnvironment = Env.IsMono ? "FastCGI" : "IIS7",
                 DebugHttpListenerHostEnvironment = Env.IsMono ? "XSP" : "WebServer20",
@@ -103,14 +106,21 @@ namespace ServiceStack
                 Return204NoContentForEmptyResponse = true,
                 AllowPartialResponses = true,
                 AllowAclUrlReservation = true,
+                AddRedirectParamsToQueryString = false,
                 RedirectToDefaultDocuments = false,
                 StripApplicationVirtualPath = false,
                 ScanSkipPaths = new List<string> {
                     "/obj/", 
                     "/bin/",
+                    "/node_modules/",
+                    "/bower_components/",
                 },
                 IgnoreWarningsOnPropertyNames = new List<string> {
                     "format", "callback", "debug", "_", "authsecret", "Version", "version"
+                },
+                XmlWriterSettings = new XmlWriterSettings
+                {
+                    Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier:false),
                 }
             };
 
@@ -131,8 +141,11 @@ namespace ServiceStack
             this.ApiVersion = instance.ApiVersion;
             this.EmbeddedResourceSources = instance.EmbeddedResourceSources;
             this.EmbeddedResourceBaseTypes = instance.EmbeddedResourceBaseTypes;
+            this.EmbeddedResourceTreatAsFiles = instance.EmbeddedResourceTreatAsFiles;
             this.EnableAccessRestrictions = instance.EnableAccessRestrictions;
             this.ServiceEndpointsMetadataConfig = instance.ServiceEndpointsMetadataConfig;
+            this.SoapServiceName = instance.SoapServiceName;
+            this.XmlWriterSettings = instance.XmlWriterSettings;
             this.LogFactory = instance.LogFactory;
             this.EnableAccessRestrictions = instance.EnableAccessRestrictions;
             this.WebHostUrl = instance.WebHostUrl;
@@ -170,6 +183,7 @@ namespace ServiceStack
             this.IgnoreWarningsOnPropertyNames = instance.IgnoreWarningsOnPropertyNames;
             this.FallbackRestPath = instance.FallbackRestPath;
             this.AllowAclUrlReservation = instance.AllowAclUrlReservation;
+            this.AddRedirectParamsToQueryString = instance.AddRedirectParamsToQueryString;
             this.RedirectToDefaultDocuments = instance.RedirectToDefaultDocuments;
             this.StripApplicationVirtualPath = instance.StripApplicationVirtualPath;
             this.ScanSkipPaths = instance.ScanSkipPaths;
@@ -188,8 +202,8 @@ namespace ServiceStack
 
         public List<Type> EmbeddedResourceBaseTypes { get; set; }
         public List<Assembly> EmbeddedResourceSources { get; set; }
+        public HashSet<string> EmbeddedResourceTreatAsFiles { get; set; }
 
-        public string SoapServiceName { get; set; }
         public string DefaultContentType { get; set; }
         public List<string> PreferredContentTypes { get; set; }
         internal string[] PreferredContentTypesArray = new string[0]; //use array at runtime
@@ -213,6 +227,8 @@ namespace ServiceStack
         public string MetadataRedirectPath { get; set; }
 
         public ServiceEndpointsMetadataConfig ServiceEndpointsMetadataConfig { get; set; }
+        public string SoapServiceName { get; set; }
+        public XmlWriterSettings XmlWriterSettings { get; set; }
         public ILogFactory LogFactory { get; set; }
         public bool EnableAccessRestrictions { get; set; }
         public bool UseBclJsonSerializers { get; set; }
@@ -242,6 +258,7 @@ namespace ServiceStack
         public bool AllowPartialResponses { get; set; }
         public bool AllowNonHttpOnlyCookies { get; set; }
         public bool AllowAclUrlReservation { get; set; }
+        public bool AddRedirectParamsToQueryString { get; set; }
         public bool RedirectToDefaultDocuments { get; set; }
         public bool StripApplicationVirtualPath { get; set; }
 

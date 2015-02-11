@@ -100,8 +100,19 @@
     <Compile Include="AddHeaderAttribute.cs" />
     <Compile Include="AppHostHttpListenerSmartPoolBase.cs" />
     <Compile Include="AppSelfHostBase.cs" />
+    <Compile Include="AspNet\ServiceStackPage.cs">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Configuration\EnvironmentVariableSettings.cs" />
+    <Compile Include="Configuration\MultiAppSettings.cs" />
+    <Compile Include="Html\Minifiers.cs" />
+    <Compile Include="NativeTypes\Swift\SwiftGenerator.cs" />
+    <Compile Include="NativeTypes\TypeScript\TypeScriptGenerator.cs" />
+    <Compile Include="NativeTypes\VbNet\VbNetGenerator.cs" />
+    <Compile Include="ServiceStackProvider.cs" />
     <Compile Include="AsyncExtensions.cs" />
     <Compile Include="Auth\AspNetWindowsAuthProvider.cs" />
+    <Compile Include="Auth\AuthEvents.cs" />
     <Compile Include="Auth\OdnoklassnikiAuthProvider.cs" />
     <Compile Include="Auth\AuthMetadataProvider.cs" />
     <Compile Include="Auth\VkAuthProvider.cs" />
@@ -113,7 +124,10 @@
     <Compile Include="CompressedResult.cs" />
     <Compile Include="Configuration\TextFileSettings.cs" />
     <Compile Include="NativeTypesFeature.cs" />
-    <Compile Include="NativeTypes\NativeTypesMetadata.cs" />
+    <Compile Include="NativeTypes\FSharp\FSharpGenerator.cs" />
+    <Compile Include="NativeTypes\NativeTypesMetadata.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="NativeTypes\NativeTypesService.cs" />
     <Compile Include="NativeTypes\CSharp\CSharpGenerator.cs" />
     <Compile Include="NativeTypes\StringBuilderWrapper.cs" />
@@ -122,7 +136,6 @@
     <Compile Include="Host\Handlers\CustomActionHandler.cs" />
     <Compile Include="Host\Handlers\HttpAsyncTaskHandler.cs" />
     <Compile Include="Host\RequestBaseWrapper.cs" />
-    <Compile Include="Messaging\IMessageHandler.cs" />
     <Compile Include="Messaging\IMessageHandlerDisposer.cs" />
     <Compile Include="Messaging\IMessageHandlerFactory.cs" />
     <Compile Include="Messaging\InMemoryTransientMessageFactory.cs" />
@@ -136,6 +149,7 @@
     <Compile Include="PostmanFeature.cs" />
     <Compile Include="RequestContext.cs" />
     <Compile Include="ServerEventsFeature.cs" />
+    <Compile Include="SitemapFeature.cs" />
     <Compile Include="SmartThreadPool\CallerThreadContext.cs" />
     <Compile Include="SmartThreadPool\CanceledWorkItemsGroup.cs" />
     <Compile Include="SmartThreadPool\EventWaitHandle.cs" />
@@ -561,6 +575,8 @@
     <Compile Include="Metadata\IndexOperationsControl.cs" />
     <Compile Include="Metadata\XsdTypeNames.cs" />
     <Compile Include="Metadata\XsdTypes.cs" />
+    <Compile Include="WebSudoFeature.cs" />
+    <Compile Include="WebSudoRequiredAttribute.cs" />
     <Compile Include="XsdUtils.cs" />
     <Compile Include="Metadata\ListTemplate.cs" />
     <Compile Include="IAppHost.cs" />
@@ -591,6 +607,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Funq\License.txt" />
+    <EmbeddedResource Include="js\ss-utils.d.ts" />
     <EmbeddedResource Include="js\ss-utils.js" />
     <EmbeddedResource Include="Templates\OperationControl.html" />
     <EmbeddedResource Include="Templates\IndexOperations.html" />

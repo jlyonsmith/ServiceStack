@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Configuration;
 using System.Net;
 using System.Web;
 using Check.ServiceInterface;
@@ -10,10 +11,12 @@ using ServiceStack;
 using ServiceStack.Api.Swagger;
 using ServiceStack.Data;
 using ServiceStack.MiniProfiler;
+using ServiceStack.MiniProfiler.Data;
 using ServiceStack.OrmLite;
 using ServiceStack.Razor;
 using ServiceStack.Text;
 using ServiceStack.Validation;
+using ServiceStack.Web;
 
 namespace CheckWeb
 {
@@ -31,11 +34,12 @@ namespace CheckWeb
         /// <param name="container">The container.</param>
         public override void Configure(Container container)
         {
-            this.CustomErrorHttpHandlers[HttpStatusCode.NotFound] = null;
+            //this.CustomErrorHttpHandlers[HttpStatusCode.NotFound] = null;
 
             // Change ServiceStack configuration
             this.SetConfig(new HostConfig
             {
+                //UseHttpsLinks = true,
                 AppendUtf8CharsetOnContentTypes = new HashSet<string> { MimeTypes.Html },
 
                 // Set to return JSON if no request content type is defined
@@ -47,6 +51,7 @@ namespace CheckWeb
 #endif
                 // Disable SOAP endpoints
                 //EnableFeatures = Feature.All.Remove(Feature.Soap)
+                //EnableFeatures = Feature.All.Remove(Feature.Metadata)
             });
 
             container.Register<IServiceClient>(c =>
@@ -71,7 +76,7 @@ namespace CheckWeb
 
             Plugins.Add(new AutoQueryFeature());
             Plugins.Add(new PostmanFeature());
-
+            Plugins.Add(new CorsFeature());
 
             container.Register<IDbConnectionFactory>(
                 new OrmLiteConnectionFactory(":memory:", SqliteDialect.Provider));
@@ -81,6 +86,15 @@ namespace CheckWeb
                 db.DropAndCreateTable<Rockstar>();
                 db.InsertAll(SeedRockstars);
             }
+
+            var dbFactory = (OrmLiteConnectionFactory)container.Resolve<IDbConnectionFactory>();
+
+            dbFactory.RegisterConnection("SqlServer", 
+                new OrmLiteConnectionFactory(
+                    "Server={0};Database=test;User Id=test;Password=test;".Fmt(Environment.GetEnvironmentVariable("CI_HOST")),
+                    SqlServerDialect.Provider) {
+                        ConnectionFilter = x => new ProfiledDbConnection(x, Profiler.Current)
+                    });
         }
 
         public static Rockstar[] SeedRockstars = new[] {
@@ -102,6 +116,7 @@ namespace CheckWeb
         {
             // Set JSON web services to return idiomatic JSON camelCase properties
             JsConfig.EmitCamelCaseNames = true;
+            //JsConfig.EmitLowercaseUnderscoreNames = true;
 
             // Set JSON web services to return ISO8601 date format
             JsConfig.DateHandler = DateHandler.ISO8601;

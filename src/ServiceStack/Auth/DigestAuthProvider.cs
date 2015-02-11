@@ -8,6 +8,7 @@ using ServiceStack.Web;
 
 namespace ServiceStack.Auth
 {
+    //DigestAuth Info: http://www.ntu.edu.sg/home/ehchua/programming/webprogramming/HTTP_Authentication.html
     public class DigestAuthProvider : AuthProvider, IAuthWithRequest
     {
         public static string Name = AuthenticateService.DigestProvider;
@@ -41,7 +42,10 @@ namespace ServiceStack.Auth
             var digestInfo = authService.Request.GetDigestAuth();
             IUserAuth userAuth;
             if (authRepo.TryAuthenticate(digestInfo, PrivateKey, NonceTimeOut, session.Sequence, out userAuth)) {
-                session.PopulateWith(userAuth);
+
+                var holdSessionId = session.Id;
+                session.PopulateWith(userAuth); //overwrites session.Id
+                session.Id = holdSessionId;
                 session.IsAuthenticated = true;
                 session.Sequence = digestInfo["nc"];
                 session.UserAuthId = userAuth.Id.ToString(CultureInfo.InvariantCulture);
@@ -61,7 +65,7 @@ namespace ServiceStack.Auth
                 }
             }
 
-            return !session.UserAuthName.IsNullOrEmpty();
+            return session != null && session.IsAuthenticated && !session.UserAuthName.IsNullOrEmpty();
         }
 
         public override object Authenticate(IServiceBase authService, IAuthSession session, Authenticate request)
@@ -89,12 +93,13 @@ namespace ServiceStack.Auth
                     return response;
 
                 return new AuthenticateResponse {
+                    UserId = session.UserAuthId,
                     UserName = userName,
                     SessionId = session.Id,
                 };
             }
 
-            throw HttpError.Unauthorized("Invalid UserName or Password");
+            throw HttpError.Unauthorized(ErrorMessages.InvalidUsernameOrPassword);
         }
 
         public override IHttpResult OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, Dictionary<string, string> authInfo)
@@ -109,7 +114,7 @@ namespace ServiceStack.Auth
             if (authRepo != null) {
                 if (tokens != null) {
                     authInfo.ForEach((x, y) => tokens.Items[x] = y);
-                    session.UserAuthId = authRepo.CreateOrMergeAuthSession(session, tokens);
+                    session.UserAuthId = authRepo.CreateOrMergeAuthSession(session, tokens).UserAuthId.ToString();
                 }
 
                 foreach (var oAuthToken in session.ProviderOAuthAccess) {
@@ -131,6 +136,7 @@ namespace ServiceStack.Auth
             try
             {
                 session.OnAuthenticated(authService, session, tokens, authInfo);
+                AuthEvents.OnAuthenticated(authService.Request, session, authService, tokens, authInfo);
             }
             finally
             {

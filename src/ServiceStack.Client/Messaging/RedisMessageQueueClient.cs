@@ -2,6 +2,7 @@
 //License: https://raw.github.com/ServiceStack/ServiceStack/master/license.txt
 
 using System;
+using System.Collections.Generic;
 using ServiceStack.Redis;
 
 namespace ServiceStack.Messaging
@@ -77,6 +78,15 @@ namespace ServiceStack.Messaging
         public void SendOneWay(string queueName, object requestDto)
         {
             Publish(queueName, MessageFactory.Create(requestDto));
+        }
+
+        public void SendAllOneWay(IEnumerable<object> requests)
+        {
+            if (requests == null) return;
+            foreach (var request in requests)
+            {
+                SendOneWay(request);
+            }
         }
 
         public void Publish(string queueName, IMessage message)

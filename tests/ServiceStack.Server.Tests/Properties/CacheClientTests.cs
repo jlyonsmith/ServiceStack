@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using ServiceStack.Auth;
 using ServiceStack.Caching;
@@ -13,6 +14,10 @@ namespace ServiceStack.Server.Tests.Properties
 {
     public class Config
     {
+        public const string ServiceStackBaseUri = "http://localhost:20000";
+        public const string AbsoluteBaseUri = ServiceStackBaseUri + "/";
+        public const string ListeningOn = ServiceStackBaseUri + "/";
+
         public static string SqlServerBuildDb = "Server={0};Database=test;User Id=test;Password=test;".Fmt(Environment.GetEnvironmentVariable("CI_HOST"));
     }
 
@@ -98,7 +103,7 @@ namespace ServiceStack.Server.Tests.Properties
     {
         public override ICacheClient CreateClient()
         {
-            return new RedisClient(Environment.GetEnvironmentVariable("CI_HOST"));
+            return new RedisManagerPool(Environment.GetEnvironmentVariable("CI_HOST")).GetCacheClient();
         }
     }
 
@@ -196,18 +201,23 @@ namespace ServiceStack.Server.Tests.Properties
             var key = 1.ToUrn<Item>();
 
             Cache.Set(key, new Item { Id = 1, Name = "Foo" }, DateTime.UtcNow.AddSeconds(-1));
-
             Assert.That(Cache.Get<Item>(key), Is.Null);
+
+            Cache.Remove(key);
 
             Cache.Set(key, new Item { Id = 1, Name = "Foo" }, TimeSpan.FromMilliseconds(100));
-            Assert.That(Cache.Get<Item>(key), Is.Not.Null);
+            var entry = Cache.Get<Item>(key);
+            Assert.That(entry, Is.Not.Null);
             Thread.Sleep(200);
 
             Assert.That(Cache.Get<Item>(key), Is.Null);
 
+            Cache.Remove(key);
+
             Cache.Set(key, new Item { Id = 1, Name = "Foo" }, DateTime.UtcNow.AddMilliseconds(200));
-            Assert.That(Cache.Get<Item>(key), Is.Not.Null);
-            Thread.Sleep(200);
+            entry = Cache.Get<Item>(key);
+            Assert.That(entry, Is.Not.Null);
+            Thread.Sleep(300);
 
             Assert.That(Cache.Get<Item>(key), Is.Null);
         }
@@ -260,6 +270,33 @@ namespace ServiceStack.Server.Tests.Properties
         }
 
         [Test]
+        public void Can_retrieve_TimeToLive_on_IAuthSession()
+        {
+            IAuthSession session = new CustomAuthSession
+            {
+                Id = "sess-1",
+                UserAuthId = "1",
+                Custom = "custom"
+            };
+
+            var sessionKey = SessionFeature.GetSessionKey(session.Id);
+            Cache.Remove(sessionKey);
+
+            var ttl = Cache.GetTimeToLive(sessionKey);
+            Assert.That(ttl, Is.Null);
+
+            Cache.Set(sessionKey, session);
+            ttl = Cache.GetTimeToLive(sessionKey);
+            Assert.That(ttl.Value, Is.EqualTo(TimeSpan.MaxValue));
+
+            var sessionExpiry = HostContext.GetDefaultSessionExpiry();
+            Cache.Set(sessionKey, session, sessionExpiry);
+            ttl = Cache.GetTimeToLive(sessionKey);
+            Assert.That(ttl.Value, Is.GreaterThan(TimeSpan.FromSeconds(0)));
+            Assert.That(ttl.Value, Is.LessThanOrEqualTo(sessionExpiry));
+        }
+
+        [Test]
         public void Can_retrieve_IAuthSession_with_global_ExcludeTypeInfo_set()
         {
             JsConfig.ExcludeTypeInfo = true;
@@ -282,6 +319,21 @@ namespace ServiceStack.Server.Tests.Properties
             Assert.That(typedSession.Custom, Is.EqualTo("custom"));
 
             JsConfig.ExcludeTypeInfo = false;
+        }
+
+        [Test]
+        public void Can_cache_multiple_items_in_parallel()
+        {
+            var cache = CreateClient();
+            var fns = 10.Times(i => (Action)(() =>
+            {
+                cache.Set("concurrent-test", "Data: {0}".Fmt(i));
+            }));
+
+            Parallel.Invoke(fns.ToArray());
+
+            var entry = cache.Get<string>("concurrent-test");
+            Assert.That(entry, Is.StringStarting("Data: "));
         }
     }
 }

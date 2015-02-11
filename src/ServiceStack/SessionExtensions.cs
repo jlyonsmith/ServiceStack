@@ -18,23 +18,34 @@ namespace ServiceStack
     /// </summary>
     public static class SessionExtensions
     {
+        public static string GetOrCreateSessionId(this IRequest httpReq)
+        {
+            var sessionId = httpReq.GetSessionId();
+            return sessionId ?? SessionFeature.CreateSessionIds(httpReq);
+        }
+
         public static string GetSessionId(this IRequest httpReq)
         {
+            if (httpReq == null)
+                httpReq = HostContext.GetCurrentRequest();
+
             var sessionOptions = GetSessionOptions(httpReq);
 
             return sessionOptions.Contains(SessionOptions.Permanent)
-                ? httpReq.GetItemOrCookie(SessionFeature.PermanentSessionId)
-                : httpReq.GetItemOrCookie(SessionFeature.SessionId);
+                ? httpReq.GetPermanentSessionId()
+                : httpReq.GetTemporarySessionId();
         }
 
         public static string GetPermanentSessionId(this IRequest httpReq)
         {
-            return httpReq.GetItemOrCookie(SessionFeature.PermanentSessionId);
+            return httpReq.GetItemOrCookie(SessionFeature.PermanentSessionId)
+                ?? httpReq.GetHeader("X-" + SessionFeature.PermanentSessionId);
         }
 
         public static string GetTemporarySessionId(this IRequest httpReq)
         {
-            return httpReq.GetItemOrCookie(SessionFeature.SessionId);
+            return httpReq.GetItemOrCookie(SessionFeature.SessionId)
+                ?? httpReq.GetHeader("X-" + SessionFeature.SessionId);
         }
 
         /// <summary>
@@ -117,6 +128,13 @@ namespace ServiceStack
         public static HashSet<string> GetSessionOptions(this IRequest httpReq)
         {
             var sessionOptions = httpReq.GetItemOrCookie(SessionFeature.SessionOptionsKey);
+            var headerOptions = httpReq.GetHeader("X-" + SessionFeature.SessionOptionsKey);
+            if (headerOptions != null)
+            {
+                sessionOptions = sessionOptions.IsNullOrEmpty()
+                    ? headerOptions
+                    : headerOptions + "," + sessionOptions;
+            }                
             return sessionOptions.IsNullOrEmpty()
                 ? new HashSet<string>()
                 : sessionOptions.Split(',').ToHashSet();
@@ -170,27 +188,14 @@ namespace ServiceStack
 
         public static string GetSessionKey(IRequest httpReq = null)
         {
-            var sessionId = SessionFeature.GetSessionId(httpReq);
+            var sessionId = httpReq.GetSessionId();
             return sessionId == null ? null : SessionFeature.GetSessionKey(sessionId);
         }
 
         public static TUserSession SessionAs<TUserSession>(this ICacheClient cache,
             IRequest httpReq = null, IResponse httpRes = null)
         {
-            var sessionKey = GetSessionKey(httpReq);
-
-            if (sessionKey != null)
-            {
-                var userSession = cache.Get<TUserSession>(sessionKey);
-                if (!Equals(userSession, default(TUserSession)))
-                    return userSession;
-            }
-
-            if (sessionKey == null)
-                SessionFeature.CreateSessionIds(httpReq, httpRes);
-
-            var unAuthorizedSession = (TUserSession)typeof(TUserSession).CreateInstance();
-            return unAuthorizedSession;
+            return SessionFeature.GetOrCreateSession<TUserSession>(cache, httpReq, httpRes);
         }
 
         public static IAuthSession GetUntypedSession(this ICacheClient cache,
@@ -215,6 +220,27 @@ namespace ServiceStack
         public static void ClearSession(this ICacheClient cache, IRequest httpReq = null)
         {
             cache.Remove(GetSessionKey(httpReq));
+        }
+
+        public static ISession GetSessionBag(this IRequest request)
+        {
+            var factory = request.TryResolve<ISessionFactory>() ?? new SessionFactory(request.GetCacheClient());
+            return factory.GetOrCreateSession(request, request.Response);
+        }
+
+        public static ISession GetSessionBag(this IServiceBase service)
+        {
+            return service.Request.GetSessionBag();
+        }
+
+        public static T Get<T>(this ISession session)
+        {
+            return session.Get<T>(typeof(T).Name);
+        }
+
+        public static void Set<T>(this ISession session, T value)
+        {
+            session.Set(typeof(T).Name, value);
         }
     }
 }

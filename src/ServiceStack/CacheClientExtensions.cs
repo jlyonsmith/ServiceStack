@@ -22,7 +22,6 @@ namespace ServiceStack
             string modifiers = null;
             if (!request.ResponseContentType.IsBinary())
             {
-
                 if (request.ResponseContentType == MimeTypes.Json)
                 {
                     string jsonp = request.GetJsonpCallback();
@@ -69,17 +68,24 @@ namespace ServiceStack
             return null;
         }
 
+        static string SerializeToString(IRequest request, object responseDto)
+        {
+            var str = responseDto as string;
+            return str ?? HostContext.ContentTypes.SerializeToString(request, responseDto);
+        }
+
         public static object Cache(this ICacheClient cacheClient,
             string cacheKey,
             object responseDto,
             IRequest request,
             TimeSpan? expireCacheIn = null)
         {
+            request.Response.Dto = responseDto;
             cacheClient.Set(cacheKey, responseDto, expireCacheIn);
 
             if (!request.ResponseContentType.IsBinary())
             {
-                string serializedDto = HostContext.ContentTypes.SerializeToString(request, responseDto);
+                string serializedDto = SerializeToString(request, responseDto);
 
                 string modifiers = null;
                 if (request.ResponseContentType.MatchesContentType(MimeTypes.Json))
@@ -187,7 +193,7 @@ namespace ServiceStack
         {
             var canRemoveByPattern = cacheClient as IRemoveByPattern;
             if (canRemoveByPattern == null)
-                throw new NotImplementedException("IRemoveByPattern is not implemented by the cache client: " + cacheClient.GetType().FullName);
+                throw new NotImplementedException("IRemoveByPattern is not implemented by: " + cacheClient.GetType().FullName);
 
             canRemoveByPattern.RemoveByRegex(regex);
         }
@@ -216,5 +222,13 @@ namespace ServiceStack
             return value;
         }
 
+        public static TimeSpan? GetTimeToLive(this ICacheClient cache, string key)
+        {
+            var extendedCache = cache as ICacheClientExtended;
+            if (extendedCache == null)
+                throw new NotFiniteNumberException("GetTimeToLive is not implemented by: " + cache.GetType().FullName);
+
+            return extendedCache.GetTimeToLive(key);
+        }
     }
 }

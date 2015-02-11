@@ -60,13 +60,8 @@ namespace ServiceStack
 
         public ISession GetOrCreateSession()
         {
-            if (HttpContext.Current != null)
-            {
-                var request = HttpContext.Current.ToRequest();
-                return GetOrCreateSession(request, request.Response);
-            }
-            
-            throw new NotImplementedException("Only ASP.NET Requests can be accessed via Singletons");
+            var request = HostContext.GetCurrentRequest();
+            return GetOrCreateSession(request, request.Response);
         }
     }
 }

@@ -9,6 +9,7 @@ using System.Net;
 using System.Text;
 using System.Web;
 using Funq;
+using ServiceStack.Text;
 using ServiceStack.Web;
 
 namespace ServiceStack.Host.HttpListener
@@ -72,15 +73,13 @@ namespace ServiceStack.Host.HttpListener
 
         public string GetRawBody()
         {
-            if (bufferedStream != null)
+            if (BufferedStream != null)
             {
-                return bufferedStream.ToArray().FromUtf8Bytes();
+                return BufferedStream.ToArray().FromUtf8Bytes();
             }
 
-            using (var reader = new StreamReader(InputStream))
-            {
-                return reader.ReadToEnd();
-            }
+            var reader = new StreamReader(InputStream);
+            return reader.ReadToEnd();
         }
 
         public string RawUrl
@@ -255,7 +254,7 @@ namespace ServiceStack.Host.HttpListener
             get
             {
                 return httpMethod
-                    ?? (httpMethod = Param(HttpHeaders.XHttpMethodOverride)
+                    ?? (httpMethod = this.GetParamInRequestHeader(HttpHeaders.XHttpMethodOverride)
                     ?? request.HttpMethod);
             }
         }
@@ -305,19 +304,19 @@ namespace ServiceStack.Host.HttpListener
 
         public bool UseBufferedStream
         {
-            get { return bufferedStream != null; }
+            get { return BufferedStream != null; }
             set
             {
-                bufferedStream = value
-                    ? bufferedStream ?? new MemoryStream(request.InputStream.ReadFully())
+                BufferedStream = value
+                    ? BufferedStream ?? new MemoryStream(request.InputStream.ReadFully())
                     : null;
             }
         }
 
-        private MemoryStream bufferedStream;
+        public MemoryStream BufferedStream { get; set; }
         public Stream InputStream
         {
-            get { return bufferedStream ?? request.InputStream; }
+            get { return BufferedStream ?? request.InputStream; }
         }
 
         public long ContentLength

@@ -27,6 +27,7 @@ namespace ServiceStack.Auth
 
         private readonly IDbConnectionFactory dbFactory;
         private readonly IHashProvider passwordHasher;
+        private bool hasInitSchema;
 
         public bool UseDistinctRoleTables { get; set; }
 
@@ -41,6 +42,7 @@ namespace ServiceStack.Auth
 
         public void InitSchema()
         {
+            hasInitSchema = true;
             using (var db = dbFactory.Open())
             {
                 db.CreateTable<TUserAuth>();
@@ -70,17 +72,10 @@ namespace ServiceStack.Auth
         private void ValidateNewUser(IUserAuth newUser)
         {
             if (newUser.UserName.IsNullOrEmpty() && newUser.Email.IsNullOrEmpty())
-            {
-                throw new ArgumentNullException("UserName or Email is required");
-            }
+                throw new ArgumentNullException(ErrorMessages.UsernameOrEmailRequired);
 
-            if (!newUser.UserName.IsNullOrEmpty())
-            {
-                if (!ValidUserNameRegEx.IsMatch(newUser.UserName))
-                {
-                    throw new ArgumentException("UserName contains invalid characters", "UserName");
-                }
-            }
+            if (!newUser.UserName.IsNullOrEmpty() && !ValidUserNameRegEx.IsMatch(newUser.UserName))
+                throw new ArgumentException(ErrorMessages.IllegalUsername, "UserName");
         }
 
         public IUserAuth CreateUserAuth(IUserAuth newUser, string password)
@@ -187,6 +182,17 @@ namespace ServiceStack.Auth
 
         public IUserAuth GetUserAuthByUserName(string userNameOrEmail)
         {
+            if (userNameOrEmail == null)
+                return null;
+
+            if (!hasInitSchema)
+            {
+                using (var db = dbFactory.Open())
+                {
+                    hasInitSchema = db.TableExists<TUserAuth>();
+                }
+                if (!hasInitSchema) throw new Exception("OrmLiteAuthRepository Db tables have not been initialized. Try calling 'InitSchema()' in your AppHost Configure method.");
+            }
             using (var db = dbFactory.Open())
             {
                 return GetUserAuthByUserName(db, userNameOrEmail);
@@ -197,8 +203,8 @@ namespace ServiceStack.Auth
         {
             var isEmail = userNameOrEmail.Contains("@");
             var userAuth = isEmail
-                ? db.Select<TUserAuth>(q => q.Email == userNameOrEmail).FirstOrDefault()
-                : db.Select<TUserAuth>(q => q.UserName == userNameOrEmail).FirstOrDefault();
+                ? db.Select<TUserAuth>(q => q.Email.ToLower() == userNameOrEmail.ToLower()).FirstOrDefault()
+                : db.Select<TUserAuth>(q => q.UserName.ToLower() == userNameOrEmail.ToLower()).FirstOrDefault();
 
             return userAuth;
         }
@@ -392,25 +398,25 @@ namespace ServiceStack.Auth
             }
         }
 
-        public string CreateOrMergeAuthSession(IAuthSession authSession, IAuthTokens tokens)
+        public IUserAuthDetails CreateOrMergeAuthSession(IAuthSession authSession, IAuthTokens tokens)
         {
-            TUserAuth userAuth = (TUserAuth)GetUserAuth(authSession, tokens) 
+            TUserAuth userAuth = (TUserAuth)GetUserAuth(authSession, tokens)
                 ?? typeof(TUserAuth).CreateInstance<TUserAuth>();
 
             using (var db = dbFactory.Open())
             {
-                var oAuthProvider = db.Select<TUserAuthDetails>(
+                var authDetails = db.Select<TUserAuthDetails>(
                     q => q.Provider == tokens.Provider && q.UserId == tokens.UserId).FirstOrDefault();
 
-                if (oAuthProvider == null)
+                if (authDetails == null)
                 {
-                    oAuthProvider = typeof(TUserAuthDetails).CreateInstance<TUserAuthDetails>();
-                    oAuthProvider.Provider = tokens.Provider;
-                    oAuthProvider.UserId = tokens.UserId;
+                    authDetails = typeof(TUserAuthDetails).CreateInstance<TUserAuthDetails>();
+                    authDetails.Provider = tokens.Provider;
+                    authDetails.UserId = tokens.UserId;
                 }
 
-                oAuthProvider.PopulateMissing(tokens, overwriteReserved:true);
-                userAuth.PopulateMissingExtended(oAuthProvider);
+                authDetails.PopulateMissing(tokens, overwriteReserved: true);
+                userAuth.PopulateMissingExtended(authDetails);
 
                 userAuth.ModifiedDate = DateTime.UtcNow;
                 if (userAuth.CreatedDate == default(DateTime))
@@ -420,17 +426,17 @@ namespace ServiceStack.Auth
 
                 db.Save(userAuth);
 
-                oAuthProvider.UserAuthId = userAuth.Id;
+                authDetails.UserAuthId = userAuth.Id;
 
-                if (oAuthProvider.CreatedDate == default(DateTime))
+                if (authDetails.CreatedDate == default(DateTime))
                 {
-                    oAuthProvider.CreatedDate = userAuth.ModifiedDate;
+                    authDetails.CreatedDate = userAuth.ModifiedDate;
                 }
-                oAuthProvider.ModifiedDate = userAuth.ModifiedDate;
+                authDetails.ModifiedDate = userAuth.ModifiedDate;
 
-                db.Save(oAuthProvider);
+                db.Save(authDetails);
 
-                return oAuthProvider.UserAuthId.ToString(CultureInfo.InvariantCulture);
+                return authDetails;
             }
         }
 

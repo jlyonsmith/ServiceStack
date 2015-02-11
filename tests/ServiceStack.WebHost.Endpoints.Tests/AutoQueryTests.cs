@@ -38,9 +38,11 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             {
                 db.DropAndCreateTable<Rockstar>();
                 db.DropAndCreateTable<RockstarAlbum>();
+                db.DropAndCreateTable<RockstarGenre>();
                 db.DropAndCreateTable<Movie>();
                 db.InsertAll(SeedRockstars);
                 db.InsertAll(SeedAlbums);
+                db.InsertAll(SeedGenres);
                 db.InsertAll(SeedMovies);
             }
 
@@ -63,13 +65,13 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         }
 
         public static Rockstar[] SeedRockstars = new[] {
-            new Rockstar { Id = 1, FirstName = "Jimi", LastName = "Hendrix", Age = 27 },
-            new Rockstar { Id = 2, FirstName = "Jim", LastName = "Morrison", Age = 27 },
-            new Rockstar { Id = 3, FirstName = "Kurt", LastName = "Cobain", Age = 27 },
-            new Rockstar { Id = 4, FirstName = "Elvis", LastName = "Presley", Age = 42 },
-            new Rockstar { Id = 5, FirstName = "David", LastName = "Grohl", Age = 44 },
-            new Rockstar { Id = 6, FirstName = "Eddie", LastName = "Vedder", Age = 48 },
-            new Rockstar { Id = 7, FirstName = "Michael", LastName = "Jackson", Age = 50 },
+            new Rockstar { Id = 1, FirstName = "Jimi", LastName = "Hendrix", Age = 27, LivingStatus = LivingStatus.Dead },
+            new Rockstar { Id = 2, FirstName = "Jim", LastName = "Morrison", Age = 27, LivingStatus = LivingStatus.Dead },
+            new Rockstar { Id = 3, FirstName = "Kurt", LastName = "Cobain", Age = 27, LivingStatus = LivingStatus.Dead },
+            new Rockstar { Id = 4, FirstName = "Elvis", LastName = "Presley", Age = 42, LivingStatus = LivingStatus.Dead },
+            new Rockstar { Id = 5, FirstName = "David", LastName = "Grohl", Age = 44, LivingStatus = LivingStatus.Alive },
+            new Rockstar { Id = 6, FirstName = "Eddie", LastName = "Vedder", Age = 48, LivingStatus = LivingStatus.Alive },
+            new Rockstar { Id = 7, FirstName = "Michael", LastName = "Jackson", Age = 50, LivingStatus = LivingStatus.Dead },
         };
 
         public static RockstarAlbum[] SeedAlbums = new[] {
@@ -77,6 +79,13 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             new RockstarAlbum { RockstarId = 3, Name = "Nevermind" },    
             new RockstarAlbum { RockstarId = 5, Name = "Foo Fighters" },    
             new RockstarAlbum { RockstarId = 6, Name = "Into the Wild" },    
+        };
+
+        public static RockstarGenre[] SeedGenres = new[] {
+            new RockstarGenre { RockstarId = 1, Name = "Rock" },    
+            new RockstarGenre { RockstarId = 3, Name = "Grunge" },    
+            new RockstarGenre { RockstarId = 5, Name = "Alternative Rock" },    
+            new RockstarGenre { RockstarId = 6, Name = "Folk Rock" },    
         };
 
         public static Movie[] SeedMovies = new[] {
@@ -97,6 +106,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
     public class QueryRockstars : QueryBase<Rockstar>
     {
         public int? Age { get; set; }
+        //public LivingStatus? LivingStatus { get; set; }
     }
 
     public class QueryRockstarsConventions : QueryBase<Rockstar>
@@ -135,6 +145,16 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         public int? Age { get; set; }
         public string AlbumName { get; set; }
     }
+
+    public class QueryMultiJoinRockstar : QueryBase<Rockstar, CustomRockstar>, 
+        IJoin<Rockstar, RockstarAlbum>,
+        IJoin<Rockstar, RockstarGenre>
+    {
+        public int? Age { get; set; }
+        public string RockstarAlbumName { get; set; }
+        public string RockstarGenreName { get; set; }
+    }
+
 
 
     public class QueryOverridedRockstars : QueryBase<Rockstar>
@@ -221,12 +241,21 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         public string Name { get; set; }
     }
 
+    public class RockstarGenre
+    {
+        [AutoIncrement]
+        public int Id { get; set; }
+        public int RockstarId { get; set; }
+        public string Name { get; set; }
+    }
+
     public class CustomRockstar
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public int? Age { get; set; }
         public string RockstarAlbumName { get; set; }
+        public string RockstarGenreName { get; set; }
     }
 
     [Route("/movies/search")]
@@ -416,6 +445,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         {
             var response = Config.ListeningOn.CombineWith("json/reply/QueryRockstars")
                 .AddQueryParam("FirstName", "Jim")
+                .AddQueryParam("LivingStatus", "Dead")
                 .GetJsonFromUrl()
                 .FromJson<QueryResponse<Rockstar>>();
 
@@ -448,6 +478,35 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             Assert.That(response.Results.Count, Is.EqualTo(1));
             albumNames = response.Results.Select(x => x.RockstarAlbumName);
             Assert.That(albumNames, Is.EquivalentTo(new[] { "Nevermind" }));
+        }
+
+        [Test]
+        public void Can_execute_query_with_multiple_JOINs_on_Rockstar_Albums_and_Genres()
+        {
+            var response = client.Get(new QueryMultiJoinRockstar());
+            Assert.That(response.Total, Is.EqualTo(TotalAlbums));
+            Assert.That(response.Results.Count, Is.EqualTo(TotalAlbums));
+            var albumNames = response.Results.Select(x => x.RockstarAlbumName);
+            Assert.That(albumNames, Is.EquivalentTo(new[] {
+                "Electric Ladyland", "Nevermind", "Foo Fighters", "Into the Wild"
+            }));
+
+            var genreNames = response.Results.Select(x => x.RockstarGenreName);
+            Assert.That(genreNames, Is.EquivalentTo(new[] {
+                "Rock", "Grunge", "Alternative Rock", "Folk Rock"
+            }));
+
+            response = client.Get(new QueryMultiJoinRockstar { RockstarAlbumName = "Nevermind" });
+            Assert.That(response.Total, Is.EqualTo(1));
+            Assert.That(response.Results.Count, Is.EqualTo(1));
+            albumNames = response.Results.Select(x => x.RockstarAlbumName);
+            Assert.That(albumNames, Is.EquivalentTo(new[] { "Nevermind" }));
+
+            response = client.Get(new QueryMultiJoinRockstar { RockstarGenreName = "Folk Rock" });
+            Assert.That(response.Total, Is.EqualTo(1));
+            Assert.That(response.Results.Count, Is.EqualTo(1));
+            albumNames = response.Results.Select(x => x.RockstarGenreName);
+            Assert.That(albumNames, Is.EquivalentTo(new[] { "Folk Rock" }));
         }
 
         [Test]
@@ -849,13 +908,13 @@ namespace ServiceStack.WebHost.Endpoints.Tests
             url = Config.ListeningOn + "query/rockstars.csv?Age=27";
             csv = url.GetStringFromUrl();
             headers = csv.SplitOnFirst('\n')[0].Trim();
-            Assert.That(headers, Is.EqualTo("Id,FirstName,LastName,Age"));
+            Assert.That(headers, Is.EqualTo("Id,FirstName,LastName,Age,LivingStatus"));
             csv.Print();
 
             url = Config.ListeningOn + "customrockstars.csv";
             csv = url.GetStringFromUrl();
             headers = csv.SplitOnFirst('\n')[0].Trim();
-            Assert.That(headers, Is.EqualTo("FirstName,LastName,Age,RockstarAlbumName"));
+            Assert.That(headers, Is.EqualTo("FirstName,LastName,Age,RockstarAlbumName,RockstarGenreName"));
             csv.Print();
         }
 

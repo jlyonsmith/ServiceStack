@@ -28,9 +28,18 @@ namespace ServiceStack.Auth
         bool HasPermission(string permission);
         bool IsAuthorized(string provider);
 
-        void OnRegistered(IServiceBase registrationService);
+        void OnRegistered(IRequest httpReq, IAuthSession session, IServiceBase service);
         void OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, Dictionary<string, string> authInfo);
         void OnLogout(IServiceBase authService);
         void OnCreated(IRequest httpReq);
+    }
+
+    public interface IWebSudoAuthSession : IAuthSession
+    {
+        DateTime AuthenticatedAt { get; set; }
+
+        int AuthenticatedCount { get; set; }
+
+        DateTime? AuthenticatedWebSudoUntil { get; set; }
     }
 }

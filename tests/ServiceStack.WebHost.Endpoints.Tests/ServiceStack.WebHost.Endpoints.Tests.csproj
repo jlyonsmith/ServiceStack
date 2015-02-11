@@ -95,6 +95,9 @@
     <Reference Include="MySql.Data">
       <HintPath>..\..\lib\MySql.Data.dll</HintPath>
     </Reference>
+    <Reference Include="NHibernate">
+      <HintPath>..\..\src\ServiceStack.Authentication.NHibernate\bin\Release\NHibernate.dll</HintPath>
+    </Reference>
     <Reference Include="Npgsql">
       <HintPath>..\..\lib\Npgsql.dll</HintPath>
     </Reference>
@@ -181,6 +184,8 @@
     <Compile Include="Config.cs" />
     <Compile Include="CustomFormatTests.cs" />
     <Compile Include="HttpErrorSyncTests.cs" />
+    <Compile Include="ReplyAllTests.cs" />
+    <Compile Include="MultiTennantAppHostTests.cs" />
     <Compile Include="RequestPipelineTests.cs" />
     <Compile Include="NestedServiceTests.cs" />
     <Compile Include="CorsFeaturePluginTests.cs" />
@@ -196,6 +201,7 @@
     <Compile Include="RestHandlerTests.cs" />
     <Compile Include="RouteInferenceTests.cs" />
     <Compile Include="RuntimeAttributeTests.cs" />
+    <Compile Include="ServerEventTests.cs" />
     <Compile Include="ServiceClientsBuiltInResponseTests.cs" />
     <Compile Include="SessionTests.cs" />
     <Compile Include="Support\Services\EchoService.cs" />
@@ -370,6 +376,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Issues\" />
     <Folder Include="ServiceModel\" />
   </ItemGroup>
   <ItemGroup>

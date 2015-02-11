@@ -6,6 +6,7 @@ using System.Net;
 using System.Runtime.Serialization;
 using System.Web;
 using Funq;
+using ServiceStack.Configuration;
 using ServiceStack.Host;
 using ServiceStack.Host.HttpListener;
 using ServiceStack.IO;
@@ -81,6 +82,11 @@ namespace ServiceStack
         public static HostConfig Config
         {
             get { return AssertAppHost().Config; }
+        }
+
+        public static IAppSettings AppSettings
+        {
+            get { return AssertAppHost().AppSettings; }
         }
 
         public static ServiceMetadata Metadata
@@ -190,12 +196,14 @@ namespace ServiceStack
 
         public static T GetPlugin<T>() where T : class, IPlugin
         {
-            return AssertAppHost().GetPlugin<T>();
+            var appHost = AppHost;
+            return appHost == null ? default(T) : appHost.GetPlugin<T>();
         }
 
         public static bool HasPlugin<T>() where T : class, IPlugin
         {
-            return AssertAppHost().HasPlugin<T>();
+            var appHost = AppHost;
+            return appHost != null && appHost.HasPlugin<T>();
         }
 
         public static string GetAppConfigPath()
@@ -233,9 +241,9 @@ namespace ServiceStack
                 "Request with '{0}' is not allowed".Fmt(requestAttrs));
         }
 
-        public static string ResolveLocalizedString(string text)
+        public static string ResolveLocalizedString(string text, IRequest request=null)
         {
-            return AssertAppHost().ResolveLocalizedString(text);
+            return AssertAppHost().ResolveLocalizedString(text, request);
         }
 
         public static string ResolveAbsoluteUrl(string virtualPath, IRequest httpReq)
@@ -323,7 +331,7 @@ namespace ServiceStack
         {
             var service = AssertAppHost().Container.Resolve<T>();
             if (service == null) return null;
-            service.Request = httpCtx != null ? httpCtx.ToRequest() : HttpContext.Current.ToRequest();
+            service.Request = httpCtx != null ? httpCtx.ToRequest() : GetCurrentRequest();
             return service;
         }
 
@@ -362,6 +370,11 @@ namespace ServiceStack
         public static void OnExceptionTypeFilter(Exception exception, ResponseStatus responseStatus)
         {
             AssertAppHost().OnExceptionTypeFilter(exception, responseStatus);
+        }
+
+        public static IRequest GetCurrentRequest()
+        {
+            return AssertAppHost().GetCurrentRequest();
         }
     }
 }

@@ -8,6 +8,7 @@ using System.Text;
 using System.Web;
 using ServiceStack.Auth;
 using ServiceStack.Caching;
+using ServiceStack.Configuration;
 using ServiceStack.Data;
 using ServiceStack.Formats;
 using ServiceStack.Html;
@@ -61,6 +62,9 @@ namespace ServiceStack.Razor
 
         public dynamic ViewBag { get; set; }
 
+        public static Action<RenderingPage, string> WriteLiteralFn = DefaultWriteLiteral;
+        public static Action<RenderingPage, TextWriter, string> WriteLiteralToFn = DefaultWriteLiteralTo;
+
         public IViewBag TypedViewBag
         {
             get { return (IViewBag)ViewBag; }
@@ -80,22 +84,32 @@ namespace ServiceStack.Razor
         //overridden by the RazorEngine when razor generates code.
         public abstract void Execute();
 
+        public static void DefaultWriteLiteral(RenderingPage page, string str)
+        {
+            page.Output.Write(str);
+        }
+
+        public static void DefaultWriteLiteralTo(RenderingPage page, TextWriter writer, string str)
+        {
+            writer.Write(str);
+        }
+
         //No HTML encoding
         public virtual void WriteLiteral(string str)
         {
-            this.Output.Write(str);
+            WriteLiteralFn(this, str);
         }
 
         //With HTML encoding
         public virtual void Write(object obj)
         {
-            this.Output.Write(HtmlEncode(obj));
+            WriteLiteralFn(this, HtmlEncode(obj));
         }
 
         //With HTML encoding
         public virtual void WriteTo(TextWriter writer, object obj)
         {
-            writer.Write(HtmlEncode(obj));
+            WriteLiteralToFn(this, writer, HtmlEncode(obj));
         }
 
         public virtual void WriteTo(TextWriter writer, HelperResult value)
@@ -119,7 +133,7 @@ namespace ServiceStack.Razor
             if (literal == null)
                 return;
 
-            writer.Write(literal);
+            WriteLiteralToFn(this, writer, literal);
         }
 
         private static string HtmlEncode(object value)
@@ -365,9 +379,19 @@ namespace ServiceStack.Razor
             set { appHost = value; }
         }
 
+        public IAppSettings AppSettings
+        {
+            get { return AppHost.AppSettings; }
+        }
+
         public virtual T Get<T>()
         {
             return this.AppHost.TryResolve<T>();
+        }
+
+        public virtual T GetPlugin<T>() where T : class, IPlugin
+        {
+            return this.AppHost.GetPlugin<T>();
         }
 
         public virtual T TryResolve<T>()
@@ -386,6 +410,15 @@ namespace ServiceStack.Razor
             return service;
         }
 
+        public virtual object ExecuteService<T>(Func<T, object> fn)
+        {
+            var service = ResolveService<T>();
+            using (service as IDisposable)
+            {
+                return fn(service);
+            }
+        }
+
         public bool IsError
         {
             get { return ModelError != null; }
@@ -396,7 +429,7 @@ namespace ServiceStack.Razor
         private ICacheClient cache;
         public ICacheClient Cache
         {
-            get { return cache ?? (cache = Get<ICacheClient>()); }
+            get { return cache ?? (cache = AppHost.GetCacheClient()); }
         }
 
         private IDbConnection db;

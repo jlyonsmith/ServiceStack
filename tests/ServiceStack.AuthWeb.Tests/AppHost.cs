@@ -6,13 +6,17 @@ using System.DirectoryServices.AccountManagement;
 using System.Net;
 using System.Threading;
 using Funq;
+using Raven.Client;
+using Raven.Client.Document;
 using ServiceStack.Admin;
 using ServiceStack.Auth;
 using ServiceStack.Authentication.OAuth2;
 using ServiceStack.Authentication.OpenId;
+using ServiceStack.Authentication.RavenDb;
 using ServiceStack.Caching;
 using ServiceStack.Configuration;
 using ServiceStack.Data;
+using ServiceStack.DataAnnotations;
 using ServiceStack.FluentValidation;
 using ServiceStack.Logging;
 using ServiceStack.MiniProfiler;
@@ -46,21 +50,31 @@ namespace ServiceStack.AuthWeb.Tests
 
             container.Register(new DataSource());
 
-            container.Register<IDbConnectionFactory>(
-                new OrmLiteConnectionFactory(":memory:", SqliteDialect.Provider) {
-                    ConnectionFilter = x => new ProfiledDbConnection(x, Profiler.Current)
-                });
+            var UsePostgreSql = false;
+            if (UsePostgreSql)
+            {
+                container.Register<IDbConnectionFactory>(
+                    new OrmLiteConnectionFactory(
+                        "Server=localhost;Port=5432;User Id=test;Password=test;Database=test;Pooling=true;MinPoolSize=0;MaxPoolSize=200", 
+                        PostgreSqlDialect.Provider) {
+                            ConnectionFilter = x => new ProfiledDbConnection(x, Profiler.Current)
+                        });
+            }
+            else
+            {
+                container.Register<IDbConnectionFactory>(
+                    new OrmLiteConnectionFactory(":memory:", SqliteDialect.Provider) {
+                        ConnectionFilter = x => new ProfiledDbConnection(x, Profiler.Current)
+                    });
+            }
 
             using (var db = container.Resolve<IDbConnectionFactory>().Open())
             {
-                db.CreateTableIfNotExists<Rockstar>();
+                db.DropAndCreateTable<Rockstar>();
                 db.Insert(Rockstar.SeedData);
             }
 
             JsConfig.EmitCamelCaseNames = true;
-
-            //Register Typed Config some services might need to access
-            var appSettings = new AppSettings();
 
             //Register a external dependency-free 
             container.Register<ICacheClient>(new MemoryCacheClient());
@@ -76,6 +90,7 @@ namespace ServiceStack.AuthWeb.Tests
 
             SetConfig(new HostConfig {
                 DebugMode = true,
+                AddRedirectParamsToQueryString = true,
             });
         }
 
@@ -89,11 +104,11 @@ namespace ServiceStack.AuthWeb.Tests
             Plugins.Add(new AuthFeature(
                 () => new CustomUserSession(), //Use your own typed Custom UserSession type
                 new IAuthProvider[] {
-                    new AspNetWindowsAuthProvider(this) {
-                        LoadUserAuthFilter = LoadUserAuthInfo,
-                        AllowAllWindowsAuthUsers = true
-                    }, 
-                    new CustomCredentialsAuthProvider(),        //HTML Form post of UserName/Password credentials
+                    //new AspNetWindowsAuthProvider(this) {
+                    //    LoadUserAuthFilter = LoadUserAuthInfo,
+                    //    AllowAllWindowsAuthUsers = true
+                    //}, 
+                    new CredentialsAuthProvider(),        //HTML Form post of UserName/Password credentials
                     new TwitterAuthProvider(appSettings),       //Sign-in with Twitter
                     new FacebookAuthProvider(appSettings),      //Sign-in with Facebook
                     new DigestAuthProvider(appSettings),        //Sign-in with Digest Auth
@@ -118,20 +133,17 @@ namespace ServiceStack.AuthWeb.Tests
             Plugins.Add(new RegistrationFeature());
 
             //override the default registration validation with your own custom implementation
-            container.RegisterAs<CustomRegistrationValidator, IValidator<Register>>();
+            Plugins.Add(new CustomRegisterPlugin());
 
-            //Store User Data into the referenced SqlServer database
-            container.Register<IAuthRepository>(c =>
-                new OrmLiteAuthRepository(c.Resolve<IDbConnectionFactory>())); //Use OrmLite DB Connection to persist the UserAuth and AuthProvider info
+            var authRepo = CreateOrmLiteAuthRepo(container, appSettings);
+            //var authRepo = CreateRavenDbAuthRepo(container, appSettings);
+            //AuthProvider.ValidateUniqueUserNames = false;
 
-            var authRepo = (OrmLiteAuthRepository)container.Resolve<IAuthRepository>(); //If using and RDBMS to persist UserAuth, we must create required tables
-            if (appSettings.Get("RecreateAuthTables", false))
-                authRepo.DropAndReCreateTables(); //Drop and re-create all Auth and registration tables
-            else
-                authRepo.InitSchema();   //Create only the missing tables
-
-            authRepo.CreateUserAuth(new UserAuth
+            try
+            {
+                authRepo.CreateUserAuth(new CustomUserAuth
                 {
+                    Custom = "CustomUserAuth",
                     DisplayName = "Credentials",
                     FirstName = "First",
                     LastName = "Last",
@@ -139,7 +151,50 @@ namespace ServiceStack.AuthWeb.Tests
                     Email = "demis.bellot@gmail.com",
                 }, "test");
 
+                authRepo.CreateUserAuth(new CustomUserAuth
+                {
+                    Custom = "CustomUserAuth",
+                    DisplayName = "Credentials",
+                    FirstName = "First",
+                    LastName = "Last",
+                    FullName = "First Last",
+                    UserName = "mythz",
+                }, "test");
+            }
+            catch (Exception ignoreExistingUser) {}
+
             Plugins.Add(new RequestLogsFeature());
+        }
+
+        private static IUserAuthRepository CreateRavenDbAuthRepo(Container container, AppSettings appSettings)
+        {
+            container.Register<IDocumentStore>(c =>
+                new DocumentStore { Url = "http://macbook:8080/" });
+
+            var documentStore = container.Resolve<IDocumentStore>();
+            documentStore.Initialize();
+
+            container.Register<IAuthRepository>(c =>
+                new RavenDbUserAuthRepository<CustomUserAuth,CustomUserAuthDetails>(c.Resolve<IDocumentStore>()));
+
+            return (IUserAuthRepository)container.Resolve<IAuthRepository>();
+        }
+
+        private static IUserAuthRepository CreateOrmLiteAuthRepo(Container container, AppSettings appSettings)
+        {
+            //Store User Data into the referenced SqlServer database
+            container.Register<IAuthRepository>(c =>
+                new OrmLiteAuthRepository(c.Resolve<IDbConnectionFactory>()));
+            
+            //Use OrmLite DB Connection to persist the UserAuth and AuthProvider info
+            var authRepo = (OrmLiteAuthRepository) container.Resolve<IAuthRepository>();
+                //If using and RDBMS to persist UserAuth, we must create required tables
+            if (appSettings.Get("RecreateAuthTables", false))
+                authRepo.DropAndReCreateTables(); //Drop and re-create all Auth and registration tables
+            else
+                authRepo.InitSchema(); //Create only the missing tables
+
+            return authRepo;
         }
 
         public void LoadUserAuthInfo(AuthUserSession userSession, IAuthTokens tokens, Dictionary<string, string> authInfo)
@@ -174,6 +229,16 @@ namespace ServiceStack.AuthWeb.Tests
         }
     }
 
+    public class CustomUserAuth : UserAuth
+    {
+        public string Custom { get; set; }
+    }
+
+    public class CustomUserAuthDetails : UserAuthDetails
+    {
+        public string Custom { get; set; }
+    }
+
     public class CustomCredentialsAuthProvider : CredentialsAuthProvider
     {
         public override bool TryAuthenticate(IServiceBase authService, string userName, string password)
@@ -198,22 +263,37 @@ namespace ServiceStack.AuthWeb.Tests
     }
 
     //Provide extra validation for the registration process
-    public class CustomRegistrationValidator : RegistrationValidator
+    public class CustomRegisterPlugin : IPlugin
     {
-        public CustomRegistrationValidator()
+        public class CustomRegistrationValidator : RegistrationValidator
         {
-            RuleSet(ApplyTo.Post, () =>
+            public CustomRegistrationValidator()
             {
-                RuleFor(x => x.DisplayName).NotEmpty();
-            });
+                RuleSet(ApplyTo.Post, () =>
+                {
+                    RuleFor(x => x.UserName).Must(x => false)
+                        .WithMessage("CustomRegistrationValidator is fired");
+                });
+            }
+        }
+
+        public void Register(IAppHost appHost)
+        {
+            appHost.RegisterAs<CustomRegistrationValidator, IValidator<Register>>();
         }
     }
 
     public class CustomUserSession : AuthUserSession
     {
-        public override void OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, System.Collections.Generic.Dictionary<string, string> authInfo)
+        public override void OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, Dictionary<string, string> authInfo)
         {
-            "OnAuthenticated()".Print();
+            var jsv = authService.Request.Dto.Dump();
+            "OnAuthenticated(): {0}".Print(jsv);
+        }
+
+        public override void OnRegistered(IRequest httpReq, IAuthSession session, IServiceBase service)
+        {
+            "OnRegistered()".Print();
         }
     }
 
@@ -267,7 +347,7 @@ namespace ServiceStack.AuthWeb.Tests
 
         public object Any(PostChatToChannel request)
         {
-            var sub = ServerEvents.GetSubscription(request.From);
+            var sub = ServerEvents.GetSubscriptionInfo(request.From);
             if (sub == null)
                 throw HttpError.NotFound("Subscription {0} does not exist".Fmt(request.From));
 
@@ -283,7 +363,7 @@ namespace ServiceStack.AuthWeb.Tests
             {
                 msg.Private = true;
                 ServerEvents.NotifyUserId(request.ToUserId, request.Selector, msg);
-                var toSubs = ServerEvents.GetSubscriptionsByUserId(request.ToUserId);
+                var toSubs = ServerEvents.GetSubscriptionInfosByUserId(request.ToUserId);
                 foreach (var toSub in toSubs)
                 {
                     msg.Message = "@{0}: {1}".Fmt(toSub.DisplayName, msg.Message);
@@ -300,7 +380,7 @@ namespace ServiceStack.AuthWeb.Tests
 
         public void Any(PostRawToChannel request)
         {
-            var sub = ServerEvents.GetSubscription(request.From);
+            var sub = ServerEvents.GetSubscriptionInfo(request.From);
             if (sub == null)
                 throw HttpError.NotFound("Subscription {0} does not exist".Fmt(request.From));
 

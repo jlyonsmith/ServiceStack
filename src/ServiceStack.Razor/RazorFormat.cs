@@ -52,6 +52,24 @@ namespace ServiceStack.Razor
         public Func<RazorViewManager, ILiveReload> LiveReloadFactory { get; set; }
         public RenderPartialDelegate RenderPartialFn { get; set; }
 
+        public Action<RenderingPage, string> OnWriteLiteral
+        {
+            set
+            {
+                if (value != null)
+                    RenderingPage.WriteLiteralFn = value;
+            }
+        }
+
+        public Action<RenderingPage, TextWriter, string> OnWriteLiteralTo
+        {
+            set
+            {
+                if (value != null)
+                    RenderingPage.WriteLiteralToFn = value;
+            }
+        }
+
         static bool DenyPathsWithLeading_(string path)
         {
             return Path.GetFileName(path).StartsWith("_");
@@ -241,6 +259,25 @@ namespace ServiceStack.Razor
 
             var ms = (MemoryStream)httpReq.Response.OutputStream;
             return ms.ToArray().FromUtf8Bytes();
+        }
+
+        public static void CollapseWhitespace(RenderingPage page, string str)
+        {
+            if (str == null) return;
+            
+            var lastChar = (char)0;
+            for (var i = 0; i < str.Length; i++)
+            {
+                var c = str[i];
+                if (c < 32) continue; // Skip all these
+                if (c == 32)
+                {
+                    if (lastChar == 32)
+                        continue; // Only write one space character
+                }
+                page.Output.Write(c);
+                lastChar = c;
+            }
         }
     }
 

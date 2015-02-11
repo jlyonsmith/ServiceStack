@@ -58,8 +58,17 @@
       <HintPath>..\..\src\packages\log4net.2.0.0\lib\net40-full\log4net.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Npgsql">
+      <HintPath>..\..\..\Test\lib\Npgsql.dll</HintPath>
+    </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\..\src\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="Raven.Abstractions">
+      <HintPath>..\..\src\packages\RavenDB.Client.2.5.2939\lib\net45\Raven.Abstractions.dll</HintPath>
+    </Reference>
+    <Reference Include="Raven.Client.Lightweight">
+      <HintPath>..\..\src\packages\RavenDB.Client.2.5.2939\lib\net45\Raven.Client.Lightweight.dll</HintPath>
     </Reference>
     <Reference Include="ServiceStack.Interfaces, Version=4.0.0.0, Culture=neutral, PublicKeyToken=e06fbc6124f57c43, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -68,6 +77,10 @@
     <Reference Include="ServiceStack.OrmLite">
       <HintPath>..\..\lib\ServiceStack.OrmLite.dll</HintPath>
     </Reference>
+    <Reference Include="ServiceStack.OrmLite.PostgreSQL, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\ServiceStack.OrmLite.PostgreSQL.dll</HintPath>
+    </Reference>
     <Reference Include="ServiceStack.OrmLite.Sqlite">
       <HintPath>..\..\lib\ServiceStack.OrmLite.Sqlite.dll</HintPath>
     </Reference>
@@ -75,6 +88,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\lib\ServiceStack.Text.dll</HintPath>
     </Reference>
+    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.DirectoryServices.AccountManagement" />
     <Reference Include="System.Runtime.Serialization" />
@@ -137,6 +151,10 @@
       <Project>{C53331DF-3690-4AEA-AB57-70672BCFA086}</Project>
       <Name>ServiceStack.Authentication.OAuth2</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\ServiceStack.Authentication.RavenDb\ServiceStack.Authentication.RavenDb.csproj">
+      <Project>{A30BD5B5-00C9-4B9D-9C9D-514B4A676FF3}</Project>
+      <Name>ServiceStack.Authentication.RavenDb</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\ServiceStack.Client\ServiceStack.Client.csproj">
       <Project>{c43f583f-abde-4dd4-bbe3-66322817a6ad}</Project>
       <Name>ServiceStack.Client</Name>
@@ -178,6 +196,11 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Views\Shared\Empty.cshtml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="basic.cshtml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

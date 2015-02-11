@@ -53,7 +53,7 @@ namespace ServiceStack
         /// <summary>
         /// If they don't have an ICacheClient configured use an In Memory one.
         /// </summary>
-        private static readonly MemoryCacheClient DefaultCache = new MemoryCacheClient { FlushOnDispose = true };
+        internal static readonly MemoryCacheClient DefaultCache = new MemoryCacheClient();
 
         public static ICacheClient GetCacheClient(this IResolver service)
         {
@@ -64,7 +64,7 @@ namespace ServiceStack
 
         public static void SaveSession(this IServiceBase service, IAuthSession session, TimeSpan? expiresIn = null)
         {
-            if (service == null) return;
+            if (service == null || session == null) return;
 
             service.Request.SaveSession(session, expiresIn);
         }
@@ -93,28 +93,27 @@ namespace ServiceStack
 
         public static void SaveSession(this IRequest httpReq, IAuthSession session, TimeSpan? expiresIn = null)
         {
-            if (httpReq == null) return;
-
-            using (var cache = httpReq.GetCacheClient())
-            {
-                var sessionKey = SessionFeature.GetSessionKey(httpReq.GetSessionId());
-                cache.CacheSet(sessionKey, session, expiresIn ?? HostContext.GetDefaultSessionExpiry());
-            }
-
-            httpReq.Items[RequestItemsSessionKey] = session;
+            HostContext.AppHost.OnSaveSession(httpReq, session, expiresIn);
         }
 
         public static void RemoveSession(this IRequest httpReq)
         {
+            RemoveSession(httpReq, httpReq.GetSessionId());
+        }
+
+        public static void RemoveSession(this IRequest httpReq, string sessionId)
+        {
             if (httpReq == null) return;
+            if (sessionId == null)
+                throw new ArgumentNullException("sessionId");
 
             using (var cache = httpReq.GetCacheClient())
             {
-                var sessionKey = SessionFeature.GetSessionKey(httpReq.GetSessionId());
+                var sessionKey = SessionFeature.GetSessionKey(sessionId);
                 cache.Remove(sessionKey);
             }
 
-            httpReq.Items.Remove(RequestItemsSessionKey);
+            httpReq.Items.Remove(SessionFeature.RequestItemsSessionKey);
         }
 
         public static IAuthSession GetSession(this IServiceBase service, bool reload = false)
@@ -122,14 +121,19 @@ namespace ServiceStack
             return service.Request.GetSession(reload);
         }
 
-        public const string RequestItemsSessionKey = "__session";
+        [Obsolete("Use SessionFeature.RequestItemsSessionKey")]
+        public const string RequestItemsSessionKey = SessionFeature.RequestItemsSessionKey;
         public static IAuthSession GetSession(this IRequest httpReq, bool reload = false)
         {
             if (httpReq == null) return null;
 
+            var mockSession = httpReq.TryResolve<IAuthSession>(); //testing
+            if (mockSession != null)
+                return mockSession;
+
             object oSession = null;
             if (!reload)
-                httpReq.Items.TryGetValue(RequestItemsSessionKey, out oSession);
+                httpReq.Items.TryGetValue(SessionFeature.RequestItemsSessionKey, out oSession);
 
             if (oSession != null)
                 return (IAuthSession)oSession;
@@ -137,20 +141,29 @@ namespace ServiceStack
             using (var cache = httpReq.GetCacheClient())
             {
                 var sessionId = httpReq.GetSessionId();
-                var session = cache.Get<IAuthSession>(SessionFeature.GetSessionKey(sessionId));
-                if (session == null)
-                {
-                    session = AuthenticateService.CurrentSessionFactory();
-                    session.Id = sessionId;
-                    session.CreatedAt = session.LastModified = DateTime.UtcNow;
-                    session.OnCreated(httpReq);
-                }
+                var sessionKey = SessionFeature.GetSessionKey(sessionId);
+                var session = (sessionKey != null ? cache.Get<IAuthSession>(sessionKey) : null)
+                    ?? SessionFeature.CreateNewSession(httpReq, sessionId);
 
-                if (httpReq.Items.ContainsKey(RequestItemsSessionKey))
-                    httpReq.Items.Remove(RequestItemsSessionKey);
+                if (httpReq.Items.ContainsKey(SessionFeature.RequestItemsSessionKey))
+                    httpReq.Items.Remove(SessionFeature.RequestItemsSessionKey);
 
-                httpReq.Items.Add(RequestItemsSessionKey, session);
+                httpReq.Items.Add(SessionFeature.RequestItemsSessionKey, session);
                 return session;
+            }
+        }
+
+        public static TimeSpan? GetSessionTimeToLive(this ICacheClient cache, string sessionId)
+        {
+            var sessionKey = SessionFeature.GetSessionKey(sessionId);
+            return cache.GetTimeToLive(sessionKey);
+        }
+
+        public static TimeSpan? GetSessionTimeToLive(this IRequest httpReq)
+        {
+            using (var cache = httpReq.GetCacheClient())
+            {
+                return cache.GetSessionTimeToLive(httpReq.GetSessionId());
             }
         }
 

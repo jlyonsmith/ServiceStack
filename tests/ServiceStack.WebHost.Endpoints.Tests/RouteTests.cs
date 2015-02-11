@@ -48,7 +48,7 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                     Assert.That(httpRes.ContentType.MatchesContentType(MimeTypes.Json));
                 });
 
-            Assert.That(response.ToLower(), Is.EqualTo( "{\"data\":\"foo\"}"));
+            Assert.That(response.ToLower(), Is.EqualTo("{\"data\":\"foo\"}"));
         }
 
         [Test]
@@ -86,9 +86,33 @@ namespace ServiceStack.WebHost.Endpoints.Tests
                     httpRes.ContentType.Print();
                     Assert.That(httpRes.ContentType.MatchesContentType(MimeTypes.Csv));
                 });
-            
+
             var lf = System.Environment.NewLine;
-			Assert.That(response, Is.EqualTo("Data{0}foo{0}".Fmt(lf)));
+            Assert.That(response, Is.EqualTo("Data{0}foo{0}".Fmt(lf)));
+        }
+
+        [Test]
+        public void Does_encode_route_with_backslash()
+        {
+            var request = new CustomRoute { Data = "D\\SN" };
+            Assert.That(request.ToUrl(), Is.EqualTo("/custom/D%5CSN"));
+            Assert.That(request.ToUrl().UrlDecode(), Is.EqualTo("/custom/D\\SN"));
+
+            //HttpListener and ASP.NET hosts doesn't support `\` or %5C in urls
+            //var client = new JsonServiceClient(Config.AbsoluteBaseUri);
+            //var response = client.Get(request);
+            //Assert.That(response.Data, Is.EqualTo("D\\SN"));
+        }
+
+        [Test]
+        public void Can_download_route_with_dot_seperator()
+        {
+            var response = Config.AbsoluteBaseUri.CombineWith("/customdot/id.data")
+                .GetJsonFromUrl()
+                .FromJson<CustomRouteDot>();
+
+            Assert.That(response.Id, Is.EqualTo("id"));
+            Assert.That(response.Data, Is.EqualTo("data"));
         }
     }
 
@@ -98,7 +122,8 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
         public override void Configure(Container container)
         {
-            SetConfig(new HostConfig {
+            SetConfig(new HostConfig
+            {
                 AllowRouteContentTypeExtensions = true
             });
 
@@ -113,9 +138,21 @@ namespace ServiceStack.WebHost.Endpoints.Tests
         public string Data { get; set; }
     }
 
+    [Route("/customdot/{Id}.{Data}")]
+    public class CustomRouteDot : IReturn<CustomRouteDot>
+    {
+        public string Id { get; set; }
+        public string Data { get; set; }
+    }
+
     public class CustomRouteService : IService
     {
         public object Any(CustomRoute request)
+        {
+            return request;
+        }
+
+        public object Any(CustomRouteDot request)
         {
             return request;
         }
@@ -156,9 +193,9 @@ namespace ServiceStack.WebHost.Endpoints.Tests
 
             var response = Config.AbsoluteBaseUri.CombineWith("/api/modified/foo.csv")
                 .GetStringFromUrl();
-            
+
             var lf = System.Environment.NewLine;
-			Assert.That(response, Is.EqualTo("Data{0}foo{0}".Fmt(lf)));
+            Assert.That(response, Is.EqualTo("Data{0}foo{0}".Fmt(lf)));
 
         }
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Web;
 using ServiceStack.Host;
@@ -20,7 +21,7 @@ namespace ServiceStack
         static private readonly RedirectHttpHandler NonRootModeDefaultHttpHandler = null;
         static private readonly IHttpHandler ForbiddenHttpHandler = null;
         static private readonly IHttpHandler NotFoundHttpHandler = null;
-        static private readonly IHttpHandler StaticFileHandler = new StaticFileHandler();
+        static private readonly IHttpHandler StaticFilesHandler = new StaticFileHandler();
         private static readonly bool IsIntegratedPipeline = false;
         private static readonly bool HostAutoRedirectsDirs = false;
 
@@ -50,7 +51,8 @@ namespace ServiceStack
             if (!IsIntegratedPipeline && isAspNetHost && !hostedAtRootPath && !Env.IsMono)
                 DefaultHttpHandler = new DefaultHttpHandler();
 
-            foreach (var file in appHost.VirtualPathProvider.GetRootFiles())
+            var rootFiles = appHost.VirtualPathProvider.GetRootFiles().ToList();
+            foreach (var file in rootFiles)
             {
                 var fileNameLower = file.Name.ToLower();
                 if (DefaultRootFileName == null && config.DefaultDocuments.Contains(fileNameLower))
@@ -59,13 +61,13 @@ namespace ServiceStack
                     if (!fileNameLower.EndsWith(".aspx"))
                     {
                         DefaultRootFileName = fileNameLower;
-                        ((StaticFileHandler)StaticFileHandler).SetDefaultFile(file.VirtualPath, file.ReadAllBytes(), file.LastModified);
+                        StaticFileHandler.SetDefaultFile(file.VirtualPath, file.ReadAllBytes(), file.LastModified);
 
                         if (DefaultHttpHandler == null)
-                            DefaultHttpHandler = new RedirectHttpHandler { RelativeUrl = DefaultRootFileName };
+                            DefaultHttpHandler = new StaticFileHandler { VirtualNode = file };
                     }
                 }
-                WebHostRootFileNames.Add(file.Name.ToLower());
+                WebHostRootFileNames.Add(fileNameLower);
             }
 
             foreach (var dir in appHost.VirtualPathProvider.GetRootDirectories())
@@ -171,7 +173,7 @@ namespace ServiceStack
                     return DefaultHttpHandler;
 
                 if (DefaultRootFileName != null)
-                    return StaticFileHandler;
+                    return StaticFilesHandler;
 
                 return NonRootModeDefaultHttpHandler;
             }
@@ -245,7 +247,7 @@ namespace ServiceStack
                     return DefaultHttpHandler;
 
                 if (DefaultRootFileName != null)
-                    return StaticFileHandler;
+                    return StaticFilesHandler;
 
                 return NonRootModeDefaultHttpHandler;
             }
@@ -346,12 +348,12 @@ namespace ServiceStack
                 if (!isFileRequest)
                 {
                     return appHost.VirtualPathProvider.DirectoryExists(pathInfo)
-                        ? StaticFileHandler
+                        ? StaticFilesHandler
                         : NotFoundHttpHandler;
                 }
 
                 return ShouldAllow(requestPath)
-                    ? StaticFileHandler
+                    ? StaticFilesHandler
                     : ForbiddenHttpHandler;
             }
 

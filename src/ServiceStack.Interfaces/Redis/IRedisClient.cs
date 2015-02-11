@@ -21,12 +21,13 @@ using ServiceStack.Redis.Pipeline;
 namespace ServiceStack.Redis
 {
     public interface IRedisClient
-        : IEntityStore, ICacheClient
+        : IEntityStore, ICacheClientExtended
     {
         //Basic Redis Connection operations
         long Db { get; set; }
         long DbSize { get; }
         Dictionary<string, string> Info { get; }
+        DateTime GetServerTime();
         DateTime LastSave { get; }
         string Host { get; }
         int Port { get; }
@@ -37,11 +38,26 @@ namespace ServiceStack.Redis
         string Password { get; set; }
         bool HadExceptions { get; }
 
+        RedisText Custom(params object[] cmdWithArgs);
+
         void Save();
         void SaveAsync();
         void Shutdown();
         void RewriteAppendOnlyFileAsync();
         void FlushDb();
+
+        RedisText GetServerRoleInfo();
+        string GetConfig(string item);
+        void SetConfig(string item, string value);
+        void SaveConfig();
+        void ResetInfoStats();
+
+        string GetClient();
+        void SetClient(string name);
+        void KillClient(string address);
+        long KillClients(string fromAddress = null, string withId = null, RedisClientType? ofType = null, bool? skipMe = null);
+        List<Dictionary<string, string>> GetClientsInfo();
+        void PauseAllClients(TimeSpan duration);
 
         //Basic Redis Connection Info
         string this[string key] { get; set; }
@@ -82,7 +98,6 @@ namespace ServiceStack.Redis
         string GetRandomKey();
         bool ExpireEntryIn(string key, TimeSpan expireIn);
         bool ExpireEntryAt(string key, DateTime expireAt);
-        TimeSpan GetTimeToLive(string key);
         List<string> GetSortedEntryValues(string key, int startingFrom, int endingAt);
 
         //Store entities without registering entity ids

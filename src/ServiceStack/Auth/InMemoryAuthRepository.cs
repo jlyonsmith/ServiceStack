@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +9,7 @@ namespace ServiceStack.Auth
     /// <summary>
     /// Thread-safe In memory UserAuth data store so it can be used without a dependency on Redis.
     /// </summary>
-    public class InMemoryAuthRepository : RedisAuthRepository
+    public class InMemoryAuthRepository : RedisAuthRepository, IDisposable 
     {
         public static readonly InMemoryAuthRepository Instance = new InMemoryAuthRepository();
 
@@ -22,13 +23,13 @@ namespace ServiceStack.Auth
 
             private TypedData()
             {
-                lock (InMemoryAuthRepository.Instance.TrackedTypes) 
+                lock (InMemoryAuthRepository.Instance.TrackedTypes)
                     InMemoryAuthRepository.Instance.TrackedTypes.Add(this);
             }
 
             internal readonly List<T> Items = new List<T>();
             internal int Sequence = 0;
-            
+
             public void Clear()
             {
                 lock (Items) Items.Clear();
@@ -36,7 +37,8 @@ namespace ServiceStack.Auth
             }
         }
 
-        public InMemoryAuthRepository() : base(new InMemoryManagerFacade(Instance))
+        public InMemoryAuthRepository()
+            : base(new InMemoryManagerFacade(Instance))
         {
             this.Sets = new Dictionary<string, HashSet<string>>();
             this.Hashes = new Dictionary<string, Dictionary<string, string>>();
@@ -45,7 +47,7 @@ namespace ServiceStack.Auth
         class InMemoryManagerFacade : IRedisClientManagerFacade
         {
             private readonly InMemoryAuthRepository root;
-            
+
             public InMemoryManagerFacade(InMemoryAuthRepository root)
             {
                 this.root = root;
@@ -118,7 +120,7 @@ namespace ServiceStack.Auth
                 }
             }
 
-            public void Store<T>(T item) 
+            public void Store<T>(T item)
             {
                 if (Equals(item, default(T))) return;
 
@@ -203,5 +205,9 @@ namespace ServiceStack.Auth
             }
         }
 
+        public void Dispose()
+        {
+            Clear();
+        }
     }
 }

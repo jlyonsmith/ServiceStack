@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using ServiceStack.Model;
 using ServiceStack.Web;
 
 namespace ServiceStack
 {
-    public class HttpError : Exception, IHttpError
+    public class HttpError : Exception, IHttpError, IResponseStatusConvertible
     {
         public HttpError() : this(null) {}
 
@@ -24,8 +25,8 @@ namespace ServiceStack
             this.Response = responseDto;
         }
 
-        public HttpError(object responseDto, int statusCode, string errorCode, string errorMessage)
-            : this(statusCode, errorCode, errorMessage)
+        public HttpError(object responseDto, int statusCode, string errorCode, string errorMessage = null, Exception innerException=null)
+            : this(statusCode, errorCode, errorMessage, innerException)
         {
             this.Response = responseDto;
         }
@@ -33,8 +34,8 @@ namespace ServiceStack
         public HttpError(HttpStatusCode statusCode, string errorCode, string errorMessage)
             : this((int)statusCode, errorCode, errorMessage){}
 
-        public HttpError(int statusCode, string errorCode, string errorMessage)
-            : base(errorMessage ?? errorCode ?? statusCode.ToString())
+        public HttpError(int statusCode, string errorCode, string errorMessage, Exception innerException = null)
+            : base(errorMessage ?? errorCode ?? statusCode.ToString(), innerException)
         {
             this.ErrorCode = errorCode ?? statusCode.ToString();
             this.Status = statusCode;
@@ -116,6 +117,12 @@ namespace ServiceStack
         public static Exception Conflict(string message)
         {
             return new HttpError(HttpStatusCode.Conflict, message);
+        }
+
+        public ResponseStatus ToResponseStatus()
+        {
+            return Response.GetResponseStatus()
+                ?? ResponseStatusUtils.CreateResponseStatus(ErrorCode, Message, null);
         }
     }
 }

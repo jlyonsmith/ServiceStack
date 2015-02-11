@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using ServiceStack.Caching;
+using ServiceStack.Text;
 
 namespace ServiceStack.Support
 {
@@ -11,6 +12,7 @@ namespace ServiceStack.Support
         public byte[] GZip(string text)
         {
             var buffer = Encoding.UTF8.GetBytes(text);
+            // Don't risk using non-MemoryStream's in incompatible Deflate/GZip classes
             using (var ms = new MemoryStream())
             using (var zipStream = new GZipStream(ms, CompressionMode.Compress))
             {

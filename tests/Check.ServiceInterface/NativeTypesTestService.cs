@@ -6,6 +6,16 @@ namespace Check.ServiceInterface
 {
     public class NativeTypesTestService : Service
     {
+        public class HelloInService : IReturn<HelloResponse>
+        {
+            public string Name { get; set; }
+        }
+
+        public object Any(HelloInService request)
+        {
+            return new HelloResponse { Result = request.Name };
+        }
+
         public object Any(Hello request)
         {
             return new HelloResponse { Result = request.Name };
@@ -14,6 +24,35 @@ namespace Check.ServiceInterface
         public object Any(HelloAnnotated request)
         {
             return new HelloAnnotatedResponse { Result = request.Name };
+        }
+
+        public object Any(HelloWithNestedClass request)
+        {
+            return new HelloResponse { Result = request.Name };
+        }
+
+        public object Any(HelloList request)
+        {
+            return request.Names.Map(name => new ListResult { Result = name });
+        }
+
+        public object Any(HelloArray request)
+        {
+            return request.Names.Map(name => new ArrayResult { Result = name });
+        }
+
+        public object Any(HelloExisting request)
+        {
+            return new HelloExistingResponse
+            {
+                ArrayResults = request.Names.Map(x => new ArrayResult { Result = x }).ToArray(),
+                ListResults = request.Names.Map(x => new ListResult { Result = x }),
+            };
+        }
+
+        public object Any(HelloWithEnum request)
+        {
+            return request;
         }
 
         public object Any(HelloExternal request)
@@ -65,6 +104,26 @@ namespace Check.ServiceInterface
             return new HelloWithInheritanceResponse { Result = request.Name };
         }
 
+        public object Any(HelloWithGenericInheritance request)
+        {
+            return request;
+        }
+
+        public object Any(HelloWithGenericInheritance2 request)
+        {
+            return request;
+        }
+
+        public object Any(HelloWithNestedInheritance request)
+        {
+            return request;
+        }
+
+        public object Any(HelloWithListInheritance request)
+        {
+            return request;
+        }
+
         public object Any(HelloWithReturn request)
         {
             return new HelloWithAlternateReturnResponse { Result = request.Name };
@@ -78,9 +137,37 @@ namespace Check.ServiceInterface
         public object Any(HelloWithType request)
         {
             return new HelloWithTypeResponse
-                {
-                    Result = new HelloType { Result = request.Name }
-                };
+            {
+                Result = new HelloType { Result = request.Name }
+            };
+        }
+
+        public object Any(HelloSession request)
+        {
+            return new HelloSessionResponse
+            {
+                Result = base.SessionAs<AuthUserSession>()
+            };
+        }
+
+        public object Any(HelloInterface request)
+        {
+            return request;
+        }
+    
+        public object Get(Request1 request)
+        {
+            return new Request1Response();
+        }
+
+        public object Get(Request2 request)
+        {
+            return new Request2Response();
+        }
+
+        public object Any(HelloInnerTypes request)
+        {
+            return new HelloInnerTypesResponse();
         }
     }
 }

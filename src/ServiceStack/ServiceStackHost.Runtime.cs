@@ -3,10 +3,12 @@
 
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Web;
+using ServiceStack.Auth;
 using ServiceStack.FluentValidation;
 using ServiceStack.Host;
 using ServiceStack.Host.Handlers;
@@ -55,40 +57,54 @@ namespace ServiceStack
 
             using (Profiler.Current.Step("Executing Request Filters"))
             {
-                //Exec all RequestFilter attributes with Priority < 0
-                var attributes = FilterAttributeCache.GetRequestFilterAttributes(requestDto.GetType());
-                var i = 0;
-                for (; i < attributes.Length && attributes[i].Priority < 0; i++)
+                if (!req.IsMultiRequest())
+                    return ApplyRequestFiltersSingle(req, res, requestDto);
+
+                var dtos = (IEnumerable)requestDto;
+                foreach (var dto in dtos)
                 {
-                    var attribute = attributes[i];
-                    Container.AutoWire(attribute);
-                    attribute.RequestFilter(req, res, requestDto);
-                    Release(attribute);
-                    if (res.IsClosed) return res.IsClosed;
+                    if (ApplyRequestFiltersSingle(req, res, dto))
+                        return true;
                 }
-
-                ExecTypedFilters(GlobalTypedRequestFilters, req, res, requestDto);
-                if (res.IsClosed) return res.IsClosed;
-
-                //Exec global filters
-                foreach (var requestFilter in GlobalRequestFilters)
-                {
-                    requestFilter(req, res, requestDto);
-                    if (res.IsClosed) return res.IsClosed;
-                }
-
-                //Exec remaining RequestFilter attributes with Priority >= 0
-                for (; i < attributes.Length && attributes[i].Priority >= 0; i++)
-                {
-                    var attribute = attributes[i];
-                    Container.AutoWire(attribute);
-                    attribute.RequestFilter(req, res, requestDto);
-                    Release(attribute);
-                    if (res.IsClosed) return res.IsClosed;
-                }
-
-                return res.IsClosed;
+                return false;
             }
+        }
+
+        protected virtual bool ApplyRequestFiltersSingle(IRequest req, IResponse res, object requestDto)
+        {
+            //Exec all RequestFilter attributes with Priority < 0
+            var attributes = FilterAttributeCache.GetRequestFilterAttributes(requestDto.GetType());
+            var i = 0;
+            for (; i < attributes.Length && attributes[i].Priority < 0; i++)
+            {
+                var attribute = attributes[i];
+                Container.AutoWire(attribute);
+                attribute.RequestFilter(req, res, requestDto);
+                Release(attribute);
+                if (res.IsClosed) return res.IsClosed;
+            }
+
+            ExecTypedFilters(GlobalTypedRequestFilters, req, res, requestDto);
+            if (res.IsClosed) return res.IsClosed;
+
+            //Exec global filters
+            foreach (var requestFilter in GlobalRequestFilters)
+            {
+                requestFilter(req, res, requestDto);
+                if (res.IsClosed) return res.IsClosed;
+            }
+
+            //Exec remaining RequestFilter attributes with Priority >= 0
+            for (; i < attributes.Length && attributes[i].Priority >= 0; i++)
+            {
+                var attribute = attributes[i];
+                Container.AutoWire(attribute);
+                attribute.RequestFilter(req, res, requestDto);
+                Release(attribute);
+                if (res.IsClosed) return res.IsClosed;
+            }
+
+            return res.IsClosed;
         }
 
         /// <summary>
@@ -103,50 +119,64 @@ namespace ServiceStack
 
             using (Profiler.Current.Step("Executing Response Filters"))
             {
-                var responseDto = response.GetResponseDto();
-                var attributes = responseDto != null
-                    ? FilterAttributeCache.GetResponseFilterAttributes(responseDto.GetType())
-                    : null;
+                if (!req.IsMultiRequest() || !(response is IEnumerable))
+                    return ApplyResponseFiltersSingle(req, res, response);
 
-                //Exec all ResponseFilter attributes with Priority < 0
-                var i = 0;
-                if (attributes != null)
+                var dtos = (IEnumerable)response;
+                foreach (var dto in dtos)
                 {
-                    for (; i < attributes.Length && attributes[i].Priority < 0; i++)
-                    {
-                        var attribute = attributes[i];
-                        Container.AutoWire(attribute);
-                        attribute.ResponseFilter(req, res, response);
-                        Release(attribute);
-                        if (res.IsClosed) return res.IsClosed;
-                    }
+                    if (ApplyResponseFiltersSingle(req, res, dto))
+                        return true;
                 }
+                return false;
+            }
+        }
 
-                ExecTypedFilters(GlobalTypedResponseFilters, req, res, response);
-                if (res.IsClosed) return res.IsClosed;
+        protected virtual bool ApplyResponseFiltersSingle(IRequest req, IResponse res, object response)
+        {
+            var responseDto = response.GetResponseDto();
+            var attributes = responseDto != null
+                ? FilterAttributeCache.GetResponseFilterAttributes(responseDto.GetType())
+                : null;
 
-                //Exec global filters
-                foreach (var responseFilter in GlobalResponseFilters)
+            //Exec all ResponseFilter attributes with Priority < 0
+            var i = 0;
+            if (attributes != null)
+            {
+                for (; i < attributes.Length && attributes[i].Priority < 0; i++)
                 {
-                    responseFilter(req, res, response);
+                    var attribute = attributes[i];
+                    Container.AutoWire(attribute);
+                    attribute.ResponseFilter(req, res, response);
+                    Release(attribute);
                     if (res.IsClosed) return res.IsClosed;
                 }
-
-                //Exec remaining RequestFilter attributes with Priority >= 0
-                if (attributes != null)
-                {
-                    for (; i < attributes.Length; i++)
-                    {
-                        var attribute = attributes[i];
-                        Container.AutoWire(attribute);
-                        attribute.ResponseFilter(req, res, response);
-                        Release(attribute);
-                        if (res.IsClosed) return res.IsClosed;
-                    }
-                }
-
-                return res.IsClosed;
             }
+
+            ExecTypedFilters(GlobalTypedResponseFilters, req, res, response);
+            if (res.IsClosed) return res.IsClosed;
+
+            //Exec global filters
+            foreach (var responseFilter in GlobalResponseFilters)
+            {
+                responseFilter(req, res, response);
+                if (res.IsClosed) return res.IsClosed;
+            }
+
+            //Exec remaining RequestFilter attributes with Priority >= 0
+            if (attributes != null)
+            {
+                for (; i < attributes.Length; i++)
+                {
+                    var attribute = attributes[i];
+                    Container.AutoWire(attribute);
+                    attribute.ResponseFilter(req, res, response);
+                    Release(attribute);
+                    if (res.IsClosed) return res.IsClosed;
+                }
+            }
+
+            return res.IsClosed;
         }
 
         public virtual bool ApplyMessageRequestFilters(IRequest req, IResponse res, object requestDto)
@@ -357,6 +387,25 @@ namespace ServiceStack
                     Message = errorMsg,
                 });
             }
+        }
+
+        public virtual void OnSaveSession(IRequest httpReq, IAuthSession session, TimeSpan? expiresIn = null)
+        {
+            if (httpReq == null) return;
+
+            using (var cache = this.GetCacheClient())
+            {
+                var sessionKey = SessionFeature.GetSessionKey(session.Id ?? httpReq.GetOrCreateSessionId());
+                session.LastModified = DateTime.UtcNow;
+                cache.CacheSet(sessionKey, session, expiresIn ?? HostContext.GetDefaultSessionExpiry());
+            }
+
+            httpReq.Items[SessionFeature.RequestItemsSessionKey] = session;
+        }
+
+        public virtual IRequest GetCurrentRequest()
+        {
+            throw new NotImplementedException(ErrorMessages.HostDoesNotSupportSingletonRequest);
         }
     }
 

@@ -56,6 +56,8 @@ namespace ServiceStack
         {
             this.FileInfo = fileResponse;
             this.AllowsPartialResponse = true;
+            if (FileInfo != null && !FileInfo.Exists)
+                throw HttpError.NotFound("{0} was not found".Fmt(FileInfo.Name));
 
             if (!asAttachment) return;
 
@@ -90,7 +92,7 @@ namespace ServiceStack
             : this(null, contentType, HttpStatusCode.OK)
         {
             this.AllowsPartialResponse = true;
-            this.ResponseStream = new MemoryStream(responseBytes);
+            this.ResponseStream = MemoryStreamFactory.GetStream(responseBytes);
         }
 
         public string ResponseText { get; private set; }
@@ -324,7 +326,7 @@ namespace ServiceStack
             }
             else if (ResponseText != null)
             {
-                using (var ms = new MemoryStream(Encoding.UTF8.GetBytes(ResponseText)))
+                using (var ms = MemoryStreamFactory.GetStream(Encoding.UTF8.GetBytes(ResponseText)))
                 {
                     ms.WritePartialTo(outputStream, rangeStart, rangeEnd);
                 }

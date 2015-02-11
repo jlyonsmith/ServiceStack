@@ -7,6 +7,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using ServiceStack.Logging;
+using ServiceStack.Text;
 using ServiceStack.Web;
 
 #if NETFX_CORE
@@ -342,7 +343,8 @@ namespace ServiceStack
                         }
                         else
                         {
-                            using (var reader = requestState.BytesData)
+                            var reader = requestState.BytesData;
+                            try
                             {
                                 if (typeof(T) == typeof(string))
                                 {
@@ -359,6 +361,11 @@ namespace ServiceStack
                                 {
                                     response = (T)this.StreamDeserializer(typeof(T), reader);
                                 }
+                            }
+                            finally
+                            {
+                                if (reader.CanRead)
+                                    reader.Dispose(); // Not yet disposed, but could've been.
                             }
                         }
 
@@ -415,7 +422,7 @@ namespace ServiceStack
                         }
                         else //Android
                         {
-                            using (var ms = new MemoryStream(bytes))
+                            using (var ms = MemoryStreamFactory.GetStream(bytes))
                             {
                                 serviceEx.ResponseDto = this.StreamDeserializer(typeof(TResponse), ms);
                             }

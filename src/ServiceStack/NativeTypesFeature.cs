@@ -15,23 +15,9 @@ namespace ServiceStack
             MetadataTypesConfig = new MetadataTypesConfig
             {
                 AddDefaultXmlNamespace = HostConfig.DefaultWsdlNamespace,
-                TypeAlias = new Dictionary<string, string> 
-                {
-                    { "String", "string" },    
-                    { "Boolean", "bool" },    
-                    { "Byte", "byte" },    
-                    { "Int16", "short" },    
-                    { "Int32", "int" },    
-                    { "Int64", "long" },    
-                    { "UInt16", "ushort" },    
-                    { "UInt32", "uint" },    
-                    { "UInt64", "ulong" },    
-                    { "Single", "float" },    
-                    { "Double", "double" },    
-                    { "Decimal", "decimal" },    
-                },
                 ExportAttributes = new HashSet<Type>
                 {
+                    typeof(FlagsAttribute),
                     typeof(ApiAttribute),
                     typeof(ApiResponseAttribute),
                     typeof(ApiMemberAttribute),
@@ -51,6 +37,15 @@ namespace ServiceStack
                 {
                     "ServiceStack",    
                     "ServiceStack.Auth",
+                    "ServiceStack.Caching",
+                    "ServiceStack.Configuration",
+                    "ServiceStack.Data",
+                    "ServiceStack.IO",
+                    "ServiceStack.Logging",
+                    "ServiceStack.Messaging",
+                    "ServiceStack.Model",
+                    "ServiceStack.Redis",
+                    "ServiceStack.Web",
                     "ServiceStack.Admin",
                     "ServiceStack.NativeTypes",    
                     "ServiceStack.Api.Swagger",    
@@ -63,7 +58,14 @@ namespace ServiceStack
                     "System.Runtime.Serialization",
                     "ServiceStack",
                     "ServiceStack.DataAnnotations",
-                }
+                },
+                DefaultTypeScriptNamespaces = new List<string>
+                {
+                },
+                DefaultSwiftNamespaces = new List<string>
+                {
+                    "Foundation",    
+                },
             };
         }
 

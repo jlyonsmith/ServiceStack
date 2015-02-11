@@ -8,7 +8,7 @@ namespace ServiceStack
     /// <summary>
     /// Enable the authentication feature and configure the AuthService.
     /// </summary>
-    public class AuthFeature : IPlugin
+    public class AuthFeature : IPlugin, IPostInitPlugin
     {
         public static bool AddUserIdHttpHeader = true;
 
@@ -18,9 +18,15 @@ namespace ServiceStack
         public Dictionary<Type, string[]> ServiceRoutes { get; set; }
         public List<IPlugin> RegisterPlugins { get; set; }
 
+        public List<IAuthEvents> AuthEvents { get; set; }
+
         public string HtmlRedirect { get; set; }
 
         public bool IncludeAuthMetadataProvider { get; set; }
+
+        public bool ValidateUniqueEmails { get; set; }
+
+        public bool ValidateUniqueUserNames { get; set; }
 
         public bool IncludeAssignRoleServices
         {
@@ -56,7 +62,7 @@ namespace ServiceStack
             this.sessionFactory = sessionFactory;
             this.authProviders = authProviders;
 
-            Func<string,string> localize = HostContext.ResolveLocalizedString;
+            Func<string,string> localize = s => HostContext.AppHost.ResolveLocalizedString(s, null);
 
             ServiceRoutes = new Dictionary<Type, string[]> {
                 { typeof(AuthenticateService), new[]
@@ -74,8 +80,11 @@ namespace ServiceStack
                 new SessionFeature()                          
             };
 
+            AuthEvents = new List<IAuthEvents>();
+
             this.HtmlRedirect = htmlRedirect ?? "~/" + localize(LocalizedStrings.Login);
             this.IncludeAuthMetadataProvider = true;
+            this.ValidateUniqueEmails = true;
         }
 
         public void Register(IAppHost appHost)
@@ -103,6 +112,36 @@ namespace ServiceStack
             return authProvider != null 
                 ? authProvider.SessionExpiry
                 : SessionFeature.DefaultSessionExpiry;
+        }
+
+        public void AfterPluginsLoaded(IAppHost appHost)
+        {
+            var authEvents = appHost.TryResolve<IAuthEvents>();
+            if (authEvents == null)
+            {
+                authEvents = AuthEvents.Count == 0
+                    ? new AuthEvents() :
+                      AuthEvents.Count == 1
+                    ? AuthEvents.First()
+                    : new MultiAuthEvents(AuthEvents);
+
+                appHost.GetContainer().Register<IAuthEvents>(authEvents);
+            }
+            else if (AuthEvents.Count > 0)
+            {
+                throw new Exception("Registering IAuthEvents via both AuthFeature.AuthEvents and IOC is not allowed");
+            }
+        }
+    }
+
+    public static class AuthFeatureExtensions
+    {
+        public static string GetHtmlRedirect(this AuthFeature feature)
+        {
+            if (feature != null)
+                return feature.HtmlRedirect;
+
+            return "~/" + HostContext.ResolveLocalizedString(LocalizedStrings.Login);
         }
     }
 }

@@ -176,6 +176,7 @@
     <Compile Include="Services\AsyncTaskServices.cs" />
     <Compile Include="Services\CookiesService.cs" />
     <Compile Include="Services\CustomPathServices.cs" />
+    <Compile Include="Services\CustomRouteService.cs" />
     <Compile Include="Shared\IocService.cs" />
     <Compile Include="Tests\AsyncProgressTests.cs" />
     <Compile Include="PageBase.cs">
@@ -269,6 +270,7 @@
     <Compile Include="Tests\RestsTestBase.cs" />
     <Compile Include="Tests\RestWebServiceTests.cs" />
     <Compile Include="Tests\SessionTests.cs" />
+    <Compile Include="Tests\SoapTests.cs" />
     <Compile Include="Tests\UniqueRequestTests.cs" />
     <Compile Include="Tests\VirtualPathTests.cs" />
     <Compile Include="Tests\WebServicesTests.cs" />
@@ -357,7 +359,7 @@
           <AutoAssignPort>False</AutoAssignPort>
           <DevelopmentServerPort>50000</DevelopmentServerPort>
           <DevelopmentServerVPath>/</DevelopmentServerVPath>
-          <IISUrl>http://localhost:50095/</IISUrl>
+          <IISUrl>http://localhost:50000/</IISUrl>
           <NTLMAuthentication>False</NTLMAuthentication>
           <UseCustomServer>False</UseCustomServer>
           <CustomServerUrl>

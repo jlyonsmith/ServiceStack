@@ -490,25 +490,23 @@ namespace ServiceStack
         {
             if (model is IJoin)
             {
-                bool leftJoin = false;
                 var dtoInterfaces = model.GetType().GetInterfaces();
-                var join = dtoInterfaces.FirstOrDefault(x => x.Name.StartsWith("IJoin`"));
-                if (join == null)
+                foreach(var innerJoin in dtoInterfaces.Where(x => x.Name.StartsWith("IJoin`")))
                 {
-                    join = dtoInterfaces.FirstOrDefault(x => x.Name.StartsWith("ILeftJoin`"));
-                    if (join == null)
-                        throw new ArgumentException("No IJoin<T1,T2,..> interface found");
-
-                    leftJoin = true;
+                    var joinTypes = innerJoin.GetGenericArguments();
+                    for (var i = 1; i < joinTypes.Length; i++)
+                    {
+                        q.Join(joinTypes[i - 1], joinTypes[i]);
+                    }
                 }
 
-                var joinTypes = join.GetGenericArguments();
-                for (var i = 1; i < joinTypes.Length; i++)
+                foreach(var leftJoin in dtoInterfaces.Where(x => x.Name.StartsWith("ILeftJoin`")))
                 {
-                    if (!leftJoin)
-                        q.Join(joinTypes[i - 1], joinTypes[i]);
-                    else
+                    var joinTypes = leftJoin.GetGenericArguments();
+                    for (var i = 1; i < joinTypes.Length; i++)
+                    {
                         q.LeftJoin(joinTypes[i - 1], joinTypes[i]);
+                    } 
                 }
             }
         }
@@ -633,7 +631,7 @@ namespace ServiceStack
                     TypeSerializer.DeserializeFromString(strValue, Array.CreateInstance(fieldType, 0).GetType())
                     : fieldType == typeof(string) ? 
                       strValue
-                    : fieldType.IsValueType ? 
+                    : fieldType.IsValueType && !fieldType.IsEnum ? 
                       Convert.ChangeType(strValue, fieldType) :
                       TypeSerializer.DeserializeFromString(strValue, fieldType);
 

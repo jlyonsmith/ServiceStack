@@ -8,19 +8,13 @@ namespace ServiceStack
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
     public class ApiMemberAttribute : AttributeBase
     {
-        public ApiMemberAttribute()
-        {
-            ParameterType = "path";
-            DataType = "string";
-        }
-
         /// <summary>
         /// Gets or sets verb to which applies attribute. By default applies to all verbs.
         /// </summary>
         public string Verb { get; set; }
 
         /// <summary>
-        /// Gets or sets parameter type: It can be only one of the following: path, query, body, model, or header.
+        /// Gets or sets parameter type: It can be only one of the following: path, query, body, form, or header.
         /// </summary>
         public string ParameterType { get; set; }
 

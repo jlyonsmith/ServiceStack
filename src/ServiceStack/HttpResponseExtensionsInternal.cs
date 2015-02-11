@@ -171,7 +171,7 @@ namespace ServiceStack
                         response.Dto = response.Dto ?? httpResult.GetDto();
 
                         response.StatusCode = httpResult.Status;
-                        response.StatusDescription = httpResult.StatusDescription ?? httpResult.StatusCode.ToString();
+                        response.StatusDescription = (httpResult.StatusDescription ?? httpResult.StatusCode.ToString()).Localize(request);
                         if (string.IsNullOrEmpty(httpResult.ContentType))
                         {
                             httpResult.ContentType = defaultContentType;
@@ -400,6 +400,16 @@ namespace ServiceStack
             return dto;
         }
 
+        public static bool ShouldWriteGlobalHeaders(IResponse httpRes)
+        {
+            if (HostContext.Config != null && !httpRes.Items.ContainsKey("__global_headers"))
+            {
+                httpRes.Items["__global_headers"] = true;
+                return true;
+            }
+            return false;
+        }
+
         public static void ApplyGlobalResponseHeaders(this HttpListenerResponse httpRes)
         {
             if (HostContext.Config == null) return;
@@ -420,7 +430,7 @@ namespace ServiceStack
 
         public static void ApplyGlobalResponseHeaders(this IResponse httpRes)
         {
-            if (HostContext.Config == null) return;
+            if (!ShouldWriteGlobalHeaders(httpRes)) return;
             foreach (var globalResponseHeader in HostContext.Config.GlobalResponseHeaders)
             {
                 httpRes.AddHeader(globalResponseHeader.Key, globalResponseHeader.Value);

@@ -102,11 +102,41 @@ namespace ServiceStack
 
         public static string GetOperationName(this Type type)
         {
-            return type.FullName != null //can be null, e.g. generic types
+            var typeName = type.FullName != null //can be null, e.g. generic types
                 ? type.FullName.SplitOnFirst("[[").First() //Generic Fullname
                     .Replace(type.Namespace + ".", "") //Trim Namespaces
                     .Replace("+", ".") //Convert nested into normal type
                 : type.Name;
+
+            return type.IsGenericParameter ? "'" + typeName : typeName;
+        }
+
+        public static string ExpandTypeName(this Type type)
+        {
+            var typeName = type.IsGenericType()
+                ?  ExpandGenericTypeName(type) 
+                : type.Name;
+
+            typeName = typeName.Replace('+', '.');
+
+            return type.IsGenericParameter ? "'" + typeName : typeName;
+        }
+
+        public static string ExpandGenericTypeName(Type type)
+        {
+            var nameOnly = type.Name.SplitOnFirst('`')[0];
+
+            var sb = new StringBuilder();
+            foreach (var arg in type.GetGenericArguments())
+            {
+                if (sb.Length > 0)
+                    sb.Append(",");
+
+                sb.Append(arg.ExpandTypeName());
+            }
+
+            var fullName = "{0}<{1}>".Fmt(nameOnly, sb);
+            return fullName;
         }
 
         public static string ToUrl(this object requestDto, string httpMethod = "GET", string formatFallbackToPredefinedRoute = null)

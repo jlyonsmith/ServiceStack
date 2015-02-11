@@ -107,8 +107,17 @@ namespace ServiceStack
         {
             if (metadata != null)
             {
+                if (HostContext.Config.HandlerFactoryPath != null && href[0] == '/')
+                    href = "/" + HostContext.Config.HandlerFactoryPath + href;
+
                 metadata.PluginLinks[href] = title;
             }
+            return metadata;
+        }
+
+        public static MetadataFeature RemovePluginLink(this MetadataFeature metadata, string href)
+        {
+            metadata.PluginLinks.Remove(href);
             return metadata;
         }
 
@@ -116,8 +125,17 @@ namespace ServiceStack
         {
             if (metadata != null)
             {
+                if (HostContext.Config.HandlerFactoryPath != null && href[0] == '/')
+                    href = "/" + HostContext.Config.HandlerFactoryPath + href;
+
                 metadata.DebugLinks[href] = title;
             }
+            return metadata;
+        }
+
+        public static MetadataFeature RemoveDebugLink(this MetadataFeature metadata, string href)
+        {
+            metadata.DebugLinks.Remove(href);
             return metadata;
         }
     }

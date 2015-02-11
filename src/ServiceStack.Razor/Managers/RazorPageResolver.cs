@@ -108,19 +108,26 @@ namespace ServiceStack.Razor.Managers
             if (httpResult != null)
                 dto = httpResult.Response;
 
-            var existingRazorPage = ResolveViewPage(httpReq, dto);
+            var existingRazorPage = ResolveViewPage(httpReq, dto)
+                ?? ResolveContentPage(httpReq);
             if (existingRazorPage == null)
+            {
                 return false;
+            }
 
             using (ExecuteRazorPage(httpReq, httpRes, dto, existingRazorPage))
             {
-                httpRes.EndRequest();
+                httpRes.EndRequest(skipHeaders:true);
                 return true;    
             }
         }
 
         public RazorPage ResolveContentPage(IRequest httpReq)
         {
+            var viewName = httpReq.GetItem(ViewKey) as string;
+            if (viewName != null)
+                return viewManager.GetContentPage(viewName);
+
             return viewManager.GetContentPage(httpReq.PathInfo);
         }
 
@@ -155,52 +162,48 @@ namespace ServiceStack.Razor.Managers
                 if (httpRes.IsClosed)
                     return result != null ? result.Item1 : null;
 
-                using (var writer = new StreamWriter(httpRes.OutputStream, UTF8EncodingWithoutBom))
-                {
-                    writer.Write(result.Item2);
-                }
+                var layoutWriter = new StreamWriter(httpRes.OutputStream, UTF8EncodingWithoutBom);
+                layoutWriter.Write(result.Item2);
+                layoutWriter.Flush();
                 return result.Item1;
             }
 
-            using (var writer = new StreamWriter(httpRes.OutputStream, UTF8EncodingWithoutBom))
-            {
-                page.WriteTo(writer);
-            }
+            var writer = new StreamWriter(httpRes.OutputStream, UTF8EncodingWithoutBom);
+            page.WriteTo(writer);
+            writer.Flush();
             return page;
         }
 
         private Tuple<IRazorView, string> ExecuteRazorPageWithLayout(RazorPage razorPage, IRequest httpReq, IResponse httpRes, object model, IRazorView pageInstance, Func<string> layout)
         {
-            using (var ms = new MemoryStream())
+            using (var ms = MemoryStreamFactory.GetStream())
             {
-                using (var childWriter = new StreamWriter(ms, UTF8EncodingWithoutBom))
+                var childWriter = new StreamWriter(ms, UTF8EncodingWithoutBom); //ms disposed in using
+                //child page needs to execute before master template to populate ViewBags, sections, etc
+                try
                 {
-                    //child page needs to execute before master template to populate ViewBags, sections, etc
-                    try
-                    {
-                        pageInstance.WriteTo(childWriter);
-                    }
-                    catch (StopExecutionException ignore) {}
-
-                    if (httpRes.IsClosed)
-                        return null;
-
-                    var childBody = ms.ToArray().FromUtf8Bytes();
-
-                    var layoutName = layout();
-                    if (!string.IsNullOrEmpty(layoutName))
-                    {
-                        var layoutPage = viewManager.GetLayoutPage(layoutName, razorPage, httpReq, model);
-                        if (layoutPage != null)
-                        {
-                            var layoutView = CreateRazorPageInstance(httpReq, httpRes, model, layoutPage);
-                            layoutView.SetChildPage(pageInstance, childBody);
-                            return ExecuteRazorPageWithLayout(layoutPage, httpReq, httpRes, model, layoutView, () => layoutView.Layout);
-                        }
-                    }
-
-                    return Tuple.Create(pageInstance, childBody);
+                    pageInstance.WriteTo(childWriter);
                 }
+                catch (StopExecutionException ignore) { }
+
+                if (httpRes.IsClosed)
+                    return null;
+
+                var childBody = ms.ToArray().FromUtf8Bytes();
+
+                var layoutName = layout();
+                if (!string.IsNullOrEmpty(layoutName))
+                {
+                    var layoutPage = viewManager.GetLayoutPage(layoutName, razorPage, httpReq, model);
+                    if (layoutPage != null)
+                    {
+                        var layoutView = CreateRazorPageInstance(httpReq, httpRes, model, layoutPage);
+                        layoutView.SetChildPage(pageInstance, childBody);
+                        return ExecuteRazorPageWithLayout(layoutPage, httpReq, httpRes, model, layoutView, () => layoutView.Layout);
+                    }
+                }
+
+                return Tuple.Create(pageInstance, childBody);
             }
         }
 
@@ -272,7 +275,7 @@ namespace ServiceStack.Razor.Managers
         public virtual string RenderPartial(string pageName, object model, bool renderHtml, StreamWriter writer, HtmlHelper htmlHelper)
         {
             var httpReq = htmlHelper.HttpRequest;
-            var razorPage = viewManager.GetPartialPage(pageName);
+            var razorPage = viewManager.GetPartialPage(httpReq, pageName);
             if (razorPage != null)
             {
                 var page = CreateRazorPageInstance(httpReq, htmlHelper.HttpResponse, model, razorPage);

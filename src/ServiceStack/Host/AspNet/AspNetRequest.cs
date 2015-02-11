@@ -8,6 +8,7 @@ using System.Net;
 using System.Web;
 using Funq;
 using ServiceStack.Logging;
+using ServiceStack.Text;
 using ServiceStack.Web;
 
 namespace ServiceStack.Host.AspNet
@@ -42,6 +43,16 @@ namespace ServiceStack.Host.AspNet
             }
 
             this.RequestPreferences = new RequestPreferences(httpContext);
+
+            if (httpContext.Items != null && httpContext.Items.Count > 0)
+            {
+                foreach (var key in httpContext.Items.Keys)
+                {
+                    var strKey = key as string;
+                    if (strKey == null) continue;
+                    Items[strKey] = httpContext.Items[key];
+                }
+            }
         }
 
         public HttpRequestBase HttpRequest
@@ -96,7 +107,7 @@ namespace ServiceStack.Host.AspNet
             get
             {
                 return httpMethod
-                    ?? (httpMethod = Param(HttpHeaders.XHttpMethodOverride)
+                    ?? (httpMethod = this.GetParamInRequestHeader(HttpHeaders.XHttpMethodOverride)
                     ?? request.HttpMethod);
             }
         }
@@ -216,9 +227,9 @@ namespace ServiceStack.Host.AspNet
 
         public string GetRawBody()
         {
-            if (bufferedStream != null)
+            if (BufferedStream != null)
             {
-                return bufferedStream.ToArray().FromUtf8Bytes();
+                return BufferedStream.ToArray().FromUtf8Bytes();
             }
 
             using (var reader = new StreamReader(InputStream))
@@ -255,7 +266,17 @@ namespace ServiceStack.Host.AspNet
 
         public string UserHostAddress
         {
-            get { return request.UserHostAddress; }
+            get
+            {
+                try
+                {
+                    return request.UserHostAddress;
+                }
+                catch (Exception ignore)
+                {
+                    return null; //Can throw in Mono FastCGI Host
+                }
+            }
         }
 
         public string XForwardedFor
@@ -321,19 +342,19 @@ namespace ServiceStack.Host.AspNet
 
         public bool UseBufferedStream
         {
-            get { return bufferedStream != null; }
+            get { return BufferedStream != null; }
             set
             {
-                bufferedStream = value
-                    ? bufferedStream ?? new MemoryStream(request.InputStream.ReadFully())
+                BufferedStream = value
+                    ? BufferedStream ?? new MemoryStream(request.InputStream.ReadFully())
                     : null;
             }
         }
 
-        private MemoryStream bufferedStream;
+        public MemoryStream BufferedStream { get; set; }
         public Stream InputStream
         {
-            get { return bufferedStream ?? request.InputStream; }
+            get { return BufferedStream ?? request.InputStream; }
         }
 
         public long ContentLength
